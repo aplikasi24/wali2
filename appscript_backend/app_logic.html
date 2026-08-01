@@ -7461,6 +7461,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                                 <button onclick="window.navigasiHariKas(1)" ${!hasNext ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition">Next <i class="fas fa-chevron-right ml-1"></i></button>
                             </div>
                             <div class="flex gap-2">
+                                <button onclick="window.bukaModalDownloadKas()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-file-download mr-1.5"></i>Download Rekap</button>
                                 <button onclick="window.bukaFilterTunggakan()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-search-dollar mr-1.5"></i>Filter Pintar</button>
                                 <button onclick="window.bayarSemuaKas('${viewedDateStr}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-check-double mr-1.5"></i>Lunas Semua</button>
                             </div>
@@ -7746,6 +7747,377 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 modal.children[0].classList.add('scale-95');
                 setTimeout(() => modal.remove(), 300);
             }
+        };
+
+        window.bukaModalDownloadKas = () => {
+            const k = db.kas_kelas;
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            let datesToCheck = [];
+            
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        datesToCheck.push(currentDate.toISOString().split('T')[0]);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            let monthsMap = {};
+            datesToCheck.forEach(d => {
+                let [yyyy, mm] = d.split('-');
+                let monthName = new Date(yyyy, parseInt(mm)-1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                monthsMap[`${yyyy}-${mm}`] = monthName;
+            });
+            
+            let monthOptions = Object.keys(monthsMap).sort().reverse().map(key => {
+                return `<option value="${key}">${monthsMap[key]}</option>`;
+            }).join('');
+            
+            if (Object.keys(monthsMap).length === 0) {
+                monthOptions = `<option value="">Belum ada data bulan</option>`;
+            }
+
+            const modalHtml = `
+            <div id="modal-download-kas" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300">
+                    <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h3 class="font-bold text-lg text-slate-800"><i class="fas fa-file-download text-teal-500 mr-2"></i>Download Rekap Kas</h3>
+                        <button onclick="document.getElementById('modal-download-kas').remove()" class="text-slate-400 hover:text-red-500 transition text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50">&times;</button>
+                    </div>
+                    <div class="p-6">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Pilih Bulan Rekapitulasi</label>
+                        <select id="kas-download-month" class="w-full border border-slate-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition font-medium mb-6">
+                            ${monthOptions}
+                        </select>
+                        
+                        <div class="flex flex-col gap-3">
+                            <button onclick="window.downloadKasCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fas fa-file-excel text-lg"></i> Unduh Excel (CSV)
+                            </button>
+                            <button onclick="window.cetakKasPDF()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fas fa-file-pdf text-lg"></i> Cetak PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            let existing = document.getElementById('modal-download-kas');
+            if (existing) existing.remove();
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            setTimeout(() => {
+                const modal = document.getElementById('modal-download-kas');
+                if(modal) {
+                    modal.classList.remove('opacity-0');
+                    modal.children[0].classList.remove('scale-95');
+                }
+            }, 10);
+        };
+
+        window.downloadKasCSV = () => {
+            const select = document.getElementById('kas-download-month');
+            const monthKey = select.value;
+            if (!monthKey) return alert('Bulan belum dipilih atau tidak ada data.');
+            
+            const k = db.kas_kelas;
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            let datesToCheck = [];
+            
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        let d = currentDate.toISOString().split('T')[0];
+                        if (d.startsWith(monthKey)) datesToCheck.push(d);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            let csvContent = "REKAP PEMBAYARAN KAS KELAS\\n";
+            csvContent += "Bulan: " + select.options[select.selectedIndex].text + "\\n\\n";
+            
+            let headerRow = ["No", "Nama Siswa"];
+            datesToCheck.forEach(d => {
+                let [yyyy, mm, dd] = d.split('-');
+                headerRow.push(`${dd}/${mm}`);
+            });
+            headerRow.push("Total Dibayar");
+            csvContent += headerRow.join(";") + "\\n";
+            
+            let totalBulanIniSiswa = 0;
+            db.students.forEach((s, idx) => {
+                let row = [idx + 1, `"${s.name}"`];
+                let totalSiswa = 0;
+                datesToCheck.forEach(d => {
+                    let byr = (k.pembayaran[s.id] && k.pembayaran[s.id][d]) !== undefined ? k.pembayaran[s.id][d] : 0;
+                    row.push(byr);
+                    totalSiswa += byr;
+                });
+                row.push(totalSiswa);
+                totalBulanIniSiswa += totalSiswa;
+                csvContent += row.join(";") + "\\n";
+            });
+            csvContent += `TOTAL KESELURUHAN PEMBAYARAN;;${Array(datesToCheck.length).fill('').join(';')};${totalBulanIniSiswa}\\n\\n\\n`;
+
+            csvContent += "REKAP PENGELUARAN KAS KELAS\\n\\n";
+            csvContent += "Tanggal;Keterangan;Nominal\\n";
+            
+            let pengeluaranBulanIni = 0;
+            k.pengeluaran.forEach(p => {
+                if (p.tgl.startsWith(monthKey)) {
+                    csvContent += `${p.tgl};"${p.keterangan}";${p.nominal}\\n`;
+                    pengeluaranBulanIni += p.nominal;
+                }
+            });
+            csvContent += `TOTAL PENGELUARAN;;${pengeluaranBulanIni}\\n\\n\\n`;
+
+            let totalBayarAllTime = 0, totalBayarBefore = 0;
+            db.students.forEach(s => {
+                if(k.pembayaran[s.id]) {
+                    Object.keys(k.pembayaran[s.id]).forEach(d => {
+                        let byr = k.pembayaran[s.id][d];
+                        totalBayarAllTime += byr;
+                        if (d < monthKey + "-01") totalBayarBefore += byr;
+                    });
+                }
+            });
+            
+            let totalKeluarAllTime = 0, totalKeluarBefore = 0;
+            k.pengeluaran.forEach(p => {
+                totalKeluarAllTime += p.nominal;
+                if (p.tgl < monthKey + "-01") totalKeluarBefore += p.nominal;
+            });
+            
+            let saldoAwalBulan = totalBayarBefore - totalKeluarBefore;
+            let saldoAkhirBulan = saldoAwalBulan + totalBulanIniSiswa - pengeluaranBulanIni;
+            let saldoRiilSaatIni = totalBayarAllTime - totalKeluarAllTime;
+
+            csvContent += "REKAP SALDO KAS\\n\\n";
+            csvContent += `Saldo Awal Bulan (sebelum ${monthKey});${saldoAwalBulan}\\n`;
+            csvContent += `Total Pemasukan Bulan Ini;${totalBulanIniSiswa}\\n`;
+            csvContent += `Total Pengeluaran Bulan Ini;${pengeluaranBulanIni}\\n`;
+            csvContent += `Saldo Akhir Bulan Ini;${saldoAkhirBulan}\\n`;
+            csvContent += `Saldo Kas Saat Ini (Keseluruhan);${saldoRiilSaatIni}\\n`;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Rekap_Kas_Kelas_${monthKey}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            document.getElementById('modal-download-kas').remove();
+        };
+
+        window.cetakKasPDF = () => {
+            const select = document.getElementById('kas-download-month');
+            const monthKey = select.value;
+            const monthName = select.options[select.selectedIndex].text;
+            if (!monthKey) return alert('Bulan belum dipilih atau tidak ada data.');
+            
+            const k = db.kas_kelas;
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            let datesToCheck = [];
+            
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        let d = currentDate.toISOString().split('T')[0];
+                        if (d.startsWith(monthKey)) datesToCheck.push(d);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            let ths = datesToCheck.map(d => {
+                let [yyyy, mm, dd] = d.split('-');
+                return `<th style="border:1px solid #000; padding:4px;">${dd}/${mm}</th>`;
+            }).join('');
+            
+            let totalBulanIniSiswa = 0;
+            let trsSiswa = db.students.map((s, idx) => {
+                let totalSiswa = 0;
+                let tds = datesToCheck.map(d => {
+                    let byr = (k.pembayaran[s.id] && k.pembayaran[s.id][d]) !== undefined ? k.pembayaran[s.id][d] : 0;
+                    totalSiswa += byr;
+                    return `<td style="border:1px solid #000; padding:4px; text-align:right;">${byr > 0 ? byr.toLocaleString('id-ID') : '-'}</td>`;
+                }).join('');
+                totalBulanIniSiswa += totalSiswa;
+                
+                return `
+                <tr>
+                    <td style="border:1px solid #000; padding:4px; text-align:center;">${idx + 1}</td>
+                    <td style="border:1px solid #000; padding:4px;">${s.name}</td>
+                    ${tds}
+                    <td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">Rp ${totalSiswa.toLocaleString('id-ID')}</td>
+                </tr>
+                `;
+            }).join('');
+
+            let trsPengeluaran = '';
+            let pengeluaranBulanIni = 0;
+            k.pengeluaran.forEach(p => {
+                if (p.tgl.startsWith(monthKey)) {
+                    pengeluaranBulanIni += p.nominal;
+                    let [yyyy, mm, dd] = p.tgl.split('-');
+                    trsPengeluaran += `
+                    <tr>
+                        <td style="border:1px solid #000; padding:4px; text-align:center;">${dd}/${mm}/${yyyy}</td>
+                        <td style="border:1px solid #000; padding:4px;">${p.keterangan}</td>
+                        <td style="border:1px solid #000; padding:4px; text-align:right;">Rp ${p.nominal.toLocaleString('id-ID')}</td>
+                    </tr>`;
+                }
+            });
+            if (!trsPengeluaran) trsPengeluaran = '<tr><td colspan="3" style="border:1px solid #000; padding:4px; text-align:center;">Tidak ada pengeluaran</td></tr>';
+
+            let totalBayarAllTime = 0, totalBayarBefore = 0;
+            db.students.forEach(s => {
+                if(k.pembayaran[s.id]) {
+                    Object.keys(k.pembayaran[s.id]).forEach(d => {
+                        let byr = k.pembayaran[s.id][d];
+                        totalBayarAllTime += byr;
+                        if (d < monthKey + "-01") totalBayarBefore += byr;
+                    });
+                }
+            });
+            let totalKeluarAllTime = 0, totalKeluarBefore = 0;
+            k.pengeluaran.forEach(p => {
+                totalKeluarAllTime += p.nominal;
+                if (p.tgl < monthKey + "-01") totalKeluarBefore += p.nominal;
+            });
+            
+            let saldoAwalBulan = totalBayarBefore - totalKeluarBefore;
+            let saldoAkhirBulan = saldoAwalBulan + totalBulanIniSiswa - pengeluaranBulanIni;
+            
+            const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Rekap Kas Kelas - ${monthName}</title>
+                <style>
+                    body { font-family: 'Times New Roman', Times, serif; color: #000; padding: 20px; font-size: 12px; }
+                    .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+                    .header h1 { font-size: 18px; margin: 0 0 5px 0; text-transform: uppercase; }
+                    .header h2 { font-size: 16px; margin: 0 0 5px 0; }
+                    .header p { margin: 0; font-size: 14px; }
+                    h3 { font-size: 14px; margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 11px; }
+                    th { background-color: #f0f0f0; }
+                    .summary-box { width: 50%; float: left; }
+                    .ttd-box { width: 40%; float: right; text-align: center; margin-top: 30px; font-size: 12px; }
+                    .clear { clear: both; }
+                    @media print {
+                        @page { margin: 1cm; size: landscape; }
+                        body { padding: 0; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>LAPORAN KEUANGAN KAS KELAS</h1>
+                    <h2>${db.pengaturan.sekolah || 'Nama Sekolah'}</h2>
+                    <p>Kelas: ${db.pengaturan.kelas || '-'} | Wali Kelas: ${db.pengaturan.nama || '-'} | Periode: ${monthName}</p>
+                </div>
+                
+                <h3>A. Rekapitulasi Pembayaran Siswa</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="border:1px solid #000; padding:4px; width:30px;">No</th>
+                            <th style="border:1px solid #000; padding:4px;">Nama Siswa</th>
+                            ${ths}
+                            <th style="border:1px solid #000; padding:4px; width:80px;">Total (Rp)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${trsSiswa}
+                        <tr>
+                            <td colspan="${2 + datesToCheck.length}" style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">TOTAL PEMASUKAN BULAN INI</td>
+                            <td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">Rp ${totalBulanIniSiswa.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <div style="page-break-inside: avoid;">
+                    <h3>B. Rekapitulasi Pengeluaran</h3>
+                    <table style="width: 70%;">
+                        <thead>
+                            <tr>
+                                <th style="border:1px solid #000; padding:4px; width:80px;">Tanggal</th>
+                                <th style="border:1px solid #000; padding:4px;">Keterangan</th>
+                                <th style="border:1px solid #000; padding:4px; width:100px;">Nominal (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${trsPengeluaran}
+                            <tr>
+                                <td colspan="2" style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">TOTAL PENGELUARAN BULAN INI</td>
+                                <td style="border:1px solid #000; padding:4px; text-align:right; font-weight:bold;">Rp ${pengeluaranBulanIni.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="page-break-inside: avoid;">
+                    <div class="summary-box">
+                        <h3>C. Ringkasan Saldo</h3>
+                        <table style="width: 90%;">
+                            <tr>
+                                <td style="padding: 4px;">Saldo Awal (Sebelum ${monthName})</td>
+                                <td style="padding: 4px; text-align:right;">Rp ${saldoAwalBulan.toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;">Total Pemasukan Bulan Ini</td>
+                                <td style="padding: 4px; text-align:right; color: green;">Rp ${totalBulanIniSiswa.toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px; border-bottom: 1px solid #000;">Total Pengeluaran Bulan Ini</td>
+                                <td style="padding: 4px; text-align:right; border-bottom: 1px solid #000; color: red;">Rp ${pengeluaranBulanIni.toLocaleString('id-ID')}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px; font-weight:bold;">Saldo Akhir ${monthName}</td>
+                                <td style="padding: 4px; text-align:right; font-weight:bold;">Rp ${saldoAkhirBulan.toLocaleString('id-ID')}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="ttd-box">
+                        <p>..................................., ${new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
+                        <p>Wali Kelas,</p>
+                        <br><br><br><br>
+                        <p style="font-weight:bold; text-decoration:underline;">${db.pengaturan.nama || '(...................................)'}</p>
+                        <p>NIP. ${db.pengaturan.nip || '...................................'}</p>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    }
+                </script>
+            </body>
+            </html>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            
+            document.getElementById('modal-download-kas').remove();
         };
 
         window.updateBayarKasModal = (studentId, dateStr, valueStr) => {
