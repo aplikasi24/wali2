@@ -7280,7 +7280,9 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 datesToCheck.forEach(date => {
                     const bayarHariIni = bayarSiswa[date] || 0;
                     if(bayarHariIni < k.nominal) {
-                        tanggalTunggakan.push(`${date} (Kur. ${k.nominal - bayarHariIni})`);
+                        const [y, m, d] = date.split('-');
+                        const dateFormatted = `${d}/${m}/${y}`;
+                        tanggalTunggakan.push(`${dateFormatted} (Kur. ${k.nominal - bayarHariIni})`);
                     }
                 });
                 
