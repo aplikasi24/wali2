@@ -7892,6 +7892,9 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             ['mapel', 'jurnal', 'tugas', 'catatan', 'inventaris', 'jadwal', 'piket', 'nilai', 'pengaturan_nilai', 'libur_dates', 'pengaturan', 'refleksi_mingguan', 'pesan_info', 'struktur_organisasi', 'kas_kelas'].forEach(k => {
                 if(!db[k]) db[k] = defaultData[k] || (k === 'nilai' || k === 'pengaturan_nilai' || k === 'libur_dates' ? {} : (k === 'pengaturan' ? {nama: window.currentUser ? window.currentUser.nama : '', nip: '-', sekolah: window.currentUser ? window.currentUser.sekolah : '', npsn: window.currentUser ? window.currentUser.npsn : ''} : (k === 'refleksi_mingguan' ? {emoji: '', teks: ''} : (k === 'kas_kelas' ? {nominal: 1000, tanggal_mulai: "2026-07-13", hari_aktif: {Senin: true, Selasa: true, Rabu: true, Kamis: true, Jumat: true, Sabtu: false, Minggu: false}, pengeluaran: [], pembayaran: {}} : []))));
             });
+            if (db.kas_kelas && db.kas_kelas.tanggal_mulai === '2023-07-17') {
+                db.kas_kelas.tanggal_mulai = '2026-07-13';
+            }
             if (Array.isArray(db.libur_dates)) {
                 let obj = {};
                 db.libur_dates.forEach(d => obj[d] = 'Libur');
