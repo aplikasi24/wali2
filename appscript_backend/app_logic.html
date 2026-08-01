@@ -8776,7 +8776,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         window.bukaModalBayarPK = (studentId) => {
             let pk = db.pembayaran_kelas;
-            const student = db.students.find(s => s.id === studentId);
+            const student = db.students.find(s => String(s.id) === String(studentId));
             if(!student) return;
 
             if (pk.items.length === 0) {
@@ -8861,7 +8861,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         window.bukaModalViewPK = (studentId) => {
             let pk = db.pembayaran_kelas;
-            const student = db.students.find(s => s.id === studentId);
+            const student = db.students.find(s => String(s.id) === String(studentId));
             if(!student) return;
 
             let totalHarus = 0;
