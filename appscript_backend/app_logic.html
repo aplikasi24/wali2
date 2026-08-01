@@ -103,7 +103,7 @@
             { id: "struktur", name: "Struktur Organisasi", icon: "fa-sitemap", title: "Struktur Organisasi", desc: "Hierarki dan pengurus kelas Anda." },
             { id: "mapel", name: "Mata Pelajaran", icon: "fa-book-open", title: "Mata Pelajaran", desc: "Daftar mata pelajaran yang Anda ampu." },
             { id: "jadwal", name: "Jadwal Mengajar", icon: "fa-calendar-alt", title: "Jadwal Mengajar", desc: "Jadwal mengajar harian Anda." },
-            { id: "absensi", name: "Absensi Siswa", icon: "fa-user-check", title: "Absensi Siswa", desc: "Kelola kehadiran siswa (Hadir, Izin, Sakit, Alpa)." },
+            { id: "presensi", name: "Presensi Siswa", icon: "fa-user-check", title: "Presensi Siswa", desc: "Kelola kehadiran siswa (Hadir, Izin, Sakit, Alpa)." },
             { id: "nilai", name: "Nilai Siswa", icon: "fa-chart-bar", title: "Nilai Siswa", desc: "Rekapitulasi dan input nilai akademik." },
             { id: "jurnal", name: "Jurnal Mengajar", icon: "fa-edit", title: "Rencana Jurnal Mengajar", desc: "Catat jurnal kegiatan belajar mengajar harian." },
             { id: "tugas", name: "Tugas Siswa", icon: "fa-tasks", title: "Tugas Siswa", desc: "Manajemen tugas dan penilaian siswa." },
@@ -195,7 +195,7 @@
         // --- Bottom Navigation Bar (Mobile) ---
         const bottomNavMenus = [
             { id: "dashboard", name: "Beranda", icon: "fa-home" },
-            { id: "absensi",   name: "Absensi",  icon: "fa-user-check" },
+            { id: "presensi",   name: "Presensi",  icon: "fa-user-check" },
             { id: "siswa",     name: "Siswa",    icon: "fa-users" },
             { id: "nilai",     name: "Nilai",    icon: "fa-chart-bar" },
             { id: "menu",      name: "Menu",     icon: "fa-th" }
@@ -254,7 +254,7 @@
                 <div class="mb-8 bg-red-50 border border-red-200 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 print-hide">
                     <div>
                         <h4 class="font-bold text-red-700 text-lg">Zona Berbahaya</h4>
-                        <p class="text-red-600 text-sm mt-1">Hapus permanen seluruh data yang sudah tersimpan (Siswa, Absensi, Jurnal, dll) dari perangkat ini.</p>
+                        <p class="text-red-600 text-sm mt-1">Hapus permanen seluruh data yang sudah tersimpan (Siswa, Presensi, Jurnal, dll) dari perangkat ini.</p>
                     </div>
                     <button onclick="window.hapusSemuaData()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition whitespace-nowrap flex items-center">
                         <i class="fas fa-trash-alt mr-2"></i>Hapus Semua Data
@@ -1900,7 +1900,7 @@
             `;
         }
 
-        // Absensi Siswa
+        // Presensi Siswa
         window.currentAbsenDate = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
 
         window.simpanAbsen = (studentId, status) => {
@@ -1934,7 +1934,7 @@
 
         window.kembaliKeHariIni = () => {
             window.currentAbsenDate = new Date().toLocaleDateString('en-CA');
-            navigateTo('absensi');
+            navigateTo('presensi');
         };
 
         window.openModalCetakAbsen = () => {
@@ -2082,7 +2082,7 @@
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <title>Rekap Absensi ${namaBulan} ${tahun}</title>
+                    <title>Rekap Presensi ${namaBulan} ${tahun}</title>
                     <style>
                         @page { size: landscape; margin: 10mm; }
                         body { font-family: Arial, sans-serif; padding: 10px; color: #333; }
@@ -2193,8 +2193,8 @@
             ws['!cols'] = colWidths;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap Absensi");
-            XLSX.writeFile(wb, `Rekap_Absensi_${namaBulan}_${tahun}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap Presensi");
+            XLSX.writeFile(wb, `Rekap_Presensi_${namaBulan}_${tahun}.xlsx`);
         };
 
         window.cetakRekapExcel = (e) => {
@@ -2264,8 +2264,8 @@
             ws['!cols'] = colWidths;
 
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Rekap Absensi");
-            XLSX.writeFile(wb, `Rekap_Absensi_${namaBulan}_${tahun}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap Presensi");
+            XLSX.writeFile(wb, `Rekap_Presensi_${namaBulan}_${tahun}.xlsx`);
             
             document.getElementById('modal-cetak-absen').remove();
         };
@@ -2274,13 +2274,13 @@
             let d = new Date(window.currentAbsenDate);
             d.setDate(d.getDate() + offset);
             window.currentAbsenDate = d.toLocaleDateString('en-CA');
-            navigateTo('absensi');
+            navigateTo('presensi');
         };
         
         window.setTanggalAbsen = (e) => {
             if(e.target.value) {
                 window.currentAbsenDate = e.target.value;
-                navigateTo('absensi');
+                navigateTo('presensi');
             }
         };
 
@@ -2309,10 +2309,10 @@
                 }
             }
             saveDB();
-            navigateTo('absensi');
+            navigateTo('presensi');
         };
 
-        function renderAbsensi() {
+        function renderPresensi() {
             const namaHariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const displayDateObj = new Date(window.currentAbsenDate);
             const namaHariIni = namaHariIndo[displayDateObj.getDay()];
@@ -2454,7 +2454,7 @@
                                 <tr class="bg-gray-100 text-gray-700 text-sm border-b border-gray-200">
                                     <th rowspan="2" class="py-2 px-3 text-center border border-gray-200 w-12">No</th>
                                     <th rowspan="2" class="py-2 px-3 border border-gray-200">Nama Siswa</th>
-                                    <th colspan="4" class="py-2 px-3 text-center border border-gray-200">Absensi Hari Ini</th>
+                                    <th colspan="4" class="py-2 px-3 text-center border border-gray-200">Presensi Hari Ini</th>
                                     <th colspan="4" class="py-2 px-3 text-center border border-gray-200 bg-gray-200">Rekap Bulan Ini (${namaBulanViewed})</th>
                                 </tr>
                                 <tr class="bg-gray-50 text-gray-600 text-xs border-b border-gray-200">
@@ -2523,7 +2523,7 @@
                     <div class="mt-10 w-full bg-gray-50 p-4 rounded-lg border border-gray-200 text-left">
                         <h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Status Penyimpanan Lokal:</h4>
                         <div class="flex justify-between text-sm border-b py-2"><span class="text-gray-600">Total Siswa</span><span class="font-bold">${db.students.length} record</span></div>
-                        <div class="flex justify-between text-sm py-2"><span class="text-gray-600">Data Absensi Hari Ini</span><span class="font-bold">${Object.keys(db.attendance_today).length} record</span></div>
+                        <div class="flex justify-between text-sm py-2"><span class="text-gray-600">Data Presensi Hari Ini</span><span class="font-bold">${Object.keys(db.attendance_today).length} record</span></div>
                     </div>
                 </div>
             `;
@@ -5922,7 +5922,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     </div>
                     <div class="bg-white p-8 rounded-2xl border shadow-sm text-center hover:border-green-500 transition cursor-pointer group">
                         <i class="fas fa-file-excel text-6xl text-green-400 group-hover:text-green-600 mb-4"></i>
-                        <h3 class="font-bold text-xl mb-2">Export Absensi (Excel)</h3>
+                        <h3 class="font-bold text-xl mb-2">Export Presensi (Excel)</h3>
                         <p class="text-sm text-gray-500">Unduh rekapitulasi kehadiran bulanan ke dalam format spreadsheet.</p>
                     </div>
                 </div>
@@ -7651,18 +7651,18 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
                 <!-- Tabel Pembayaran -->
                 <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 overflow-hidden">
-                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-5 gap-3">
-                        <h2 class="text-lg font-bold text-slate-800"><i class="fas fa-users mr-2 text-blue-500"></i>Daftar Siswa & Pembayaran</h2>
-                        <div class="flex flex-col sm:flex-row items-center gap-3">
-                            <div class="flex bg-slate-100 rounded-xl p-1 shadow-inner items-center">
-                                <button onclick="window.navigasiHariKas(-1)" ${!hasPrev ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition"><i class="fas fa-chevron-left mr-1"></i> Prev</button>
-                                <span class="px-4 font-bold text-slate-800 text-sm whitespace-nowrap">${datesToCheck.length > 0 ? viewedDateFormatted : 'Tidak ada hari aktif'}</span>
-                                <button onclick="window.navigasiHariKas(1)" ${!hasNext ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition">Next <i class="fas fa-chevron-right ml-1"></i></button>
+                    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-5 gap-4">
+                        <h2 class="text-lg font-bold text-slate-800 shrink-0"><i class="fas fa-users mr-2 text-blue-500"></i>Daftar Siswa & Pembayaran</h2>
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto overflow-hidden">
+                            <div class="flex bg-slate-100 rounded-xl p-1 shadow-inner items-center justify-between w-full sm:w-auto shrink-0">
+                                <button onclick="window.navigasiHariKas(-1)" ${!hasPrev ? 'disabled' : ''} class="px-2 sm:px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition text-sm"><i class="fas fa-chevron-left sm:mr-1"></i> <span class="hidden sm:inline">Prev</span></button>
+                                <span class="px-2 sm:px-4 font-bold text-slate-800 text-xs sm:text-sm whitespace-nowrap text-center flex-1">${datesToCheck.length > 0 ? viewedDateFormatted : 'Tidak ada hari aktif'}</span>
+                                <button onclick="window.navigasiHariKas(1)" ${!hasNext ? 'disabled' : ''} class="px-2 sm:px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition text-sm"><span class="hidden sm:inline">Next</span> <i class="fas fa-chevron-right sm:ml-1"></i></button>
                             </div>
-                            <div class="flex gap-2">
-                                <button onclick="window.bukaModalDownloadKas()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-file-download mr-1.5"></i>Download Rekap</button>
-                                <button onclick="window.bukaFilterTunggakan()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-search-dollar mr-1.5"></i>Filter Pintar</button>
-                                <button onclick="window.bayarSemuaKas('${viewedDateStr}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-check-double mr-1.5"></i>Lunas Semua</button>
+                            <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-start sm:justify-end">
+                                <button onclick="window.bukaModalDownloadKas()" class="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white font-bold px-3 py-2 rounded-xl text-xs sm:text-sm transition shadow-sm whitespace-nowrap text-center"><i class="fas fa-file-download mr-1.5"></i>Rekap</button>
+                                <button onclick="window.bukaFilterTunggakan()" class="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-2 rounded-xl text-xs sm:text-sm transition shadow-sm whitespace-nowrap text-center"><i class="fas fa-search-dollar mr-1.5"></i>Filter</button>
+                                <button onclick="window.bayarSemuaKas('${viewedDateStr}')" class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 rounded-xl text-xs sm:text-sm transition shadow-sm whitespace-nowrap text-center"><i class="fas fa-check-double mr-1.5"></i>Lunas Semua</button>
                             </div>
                         </div>
                     </div>
@@ -8613,7 +8613,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     case 'struktur': contentHtml += renderStrukturOrganisasi(); break;
                     case 'mapel': contentHtml += renderMapel(); break;
                     case 'jadwal': contentHtml += renderJadwal(); break;
-                    case 'absensi': contentHtml += renderAbsensi(); break;
+                    case 'presensi': contentHtml += renderPresensi(); break;
                     case 'nilai': contentHtml += renderNilai(); break;
                     case 'jurnal': contentHtml += renderJurnal(); break;
                     case 'tugas': contentHtml += renderTugas(); break;
