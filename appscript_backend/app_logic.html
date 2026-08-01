@@ -7349,7 +7349,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             let totalPengeluaran = 0;
             k.pengeluaran.forEach(p => totalPengeluaran += p.nominal);
 
-            let dataPengeluaran = k.pengeluaran;
+            let dataPengeluaran = k.pengeluaran.map((p, index) => ({
+                ...p,
+                no: index + 1
+            })).reverse();
             let totalPagesPengeluaran = 1;
             
             if (window.pengeluaranPerPage !== 'semua') {
@@ -7366,6 +7369,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             let trsPengeluaran = dataPengeluaran.map(p => {
                 return `
                 <tr class="border-b border-slate-100">
+                    <td class="p-2 text-sm text-center text-slate-500 font-bold">${p.no}</td>
                     <td class="p-2 text-sm">${p.tgl}</td>
                     <td class="p-2 text-sm">${p.keterangan}</td>
                     <td class="p-2 text-sm text-right font-bold text-red-600">Rp ${p.nominal.toLocaleString('id-ID')}</td>
@@ -7375,7 +7379,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             }).join('');
             
             if(k.pengeluaran.length === 0) {
-                trsPengeluaran = '<tr><td colspan="4" class="text-center p-4 text-slate-500 italic">Belum ada pengeluaran.</td></tr>';
+                trsPengeluaran = '<tr><td colspan="5" class="text-center p-4 text-slate-500 italic">Belum ada pengeluaran.</td></tr>';
             }
             
             let paginationHtml = '';
@@ -7494,6 +7498,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                             <table class="w-full text-left">
                                 <thead class="bg-slate-50 border-b border-slate-200">
                                     <tr>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-10">No</th>
                                         <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tgl</th>
                                         <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
                                         <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Nominal</th>
@@ -7503,7 +7508,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                                 <tbody>${trsPengeluaran}</tbody>
                                 <tfoot class="bg-red-50 border-t border-red-100">
                                     <tr>
-                                        <td colspan="2" class="p-3 text-right font-bold text-red-800 text-sm">Total Digunakan</td>
+                                        <td colspan="3" class="p-3 text-right font-bold text-red-800 text-sm">Total Digunakan</td>
                                         <td colspan="2" class="p-3 font-bold text-red-700 text-right text-base">Rp ${totalPengeluaran.toLocaleString('id-ID')}</td>
                                     </tr>
                                 </tfoot>
