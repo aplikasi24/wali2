@@ -7325,6 +7325,9 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                         <div class="flex items-center gap-2">
                             <span class="text-slate-400 font-bold text-xs">Rp</span>
                             <input type="number" id="input-bayar-${s.id}" class="w-24 border border-slate-300 rounded-lg p-1.5 text-sm outline-none focus:border-blue-500 font-bold ${inputBgColor} ${inputTextColor}" value="${bayarViewed === 0 ? '' : bayarViewed}" onblur="window.updateBayarKas('${s.id}', '${viewedDateStr}', this.value)" placeholder="0">
+                            <button onclick="window.updateBayarKas('${s.id}', '${viewedDateStr}', 0)" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2 py-1.5 rounded-lg font-bold shadow-sm transition whitespace-nowrap" title="Tandai Belum Bayar">
+                                <i class="fas fa-times mr-1"></i>Blm Byr
+                            </button>
                         </div>
                     </td>
                     <td class="p-3 text-sm font-bold text-blue-600 text-right">Rp ${kasMingguIni.toLocaleString('id-ID')}</td>
@@ -7511,7 +7514,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
         };
 
         window.bayarSemuaKas = (dateStr) => {
-            if(!confirm("Yakin ingin melunasi kas untuk semua siswa di tanggal ini?")) return;
+            if(!confirm("Gas auto-lunasin kas 1 kelas buat tanggal ini? 😎💸")) return;
             const nom = db.kas_kelas.nominal;
             db.students.forEach(s => {
                 if(!db.kas_kelas.pembayaran[s.id]) db.kas_kelas.pembayaran[s.id] = {};
