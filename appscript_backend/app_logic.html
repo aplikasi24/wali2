@@ -57,7 +57,17 @@
                 { id: '3', name: 'Agus Pratama', title: 'Sekretaris', parentId: '1', photo: '' },
                 { id: '4', name: 'Rini Yulianti', title: 'Bendahara', parentId: '1', photo: '' },
                 { id: '5', name: 'Dedi Kusuma', title: 'Seksi Keamanan', parentId: '2', photo: '' }
-            ]
+            ],
+            kas_kelas: {
+                nominal: 1000,
+                tanggal_mulai: "2023-07-17", // Default contoh
+                hari_aktif: { Senin: true, Selasa: true, Rabu: true, Kamis: true, Jumat: true, Sabtu: false, Minggu: false },
+                pengeluaran: [], // { id, tgl, nominal, keterangan }
+                pembayaran: {} // { studentId: { 'YYYY-MM-DD': nominal } } ATAU { studentId: total_dibayar } untuk kesederhanaan.
+                // Wait, if it's based on date, maybe better to just use a simple total_dibayar if they can pay any amount at any time, 
+                // but the prompt says "daftar nama anak yang kurang di tanggal berapa". So let's store by date:
+                // pembayaran: { studentId: { '2023-10-12': 1000 } }
+            }
         };
 
         let db;
@@ -101,6 +111,7 @@
             { id: "piket", name: "Jadwal Piket", icon: "fa-broom", title: "Jadwal Piket", desc: "Jadwal regu kerja piket kebersihan kelas." },
             { id: "refleksi", name: "Refleksi Mingguan", icon: "fa-lightbulb", title: "Refleksi Mingguan", desc: "Catatan refleksi kinerja guru setiap akhir pekan." },
             { id: "inventaris", name: "Inventaris", icon: "fa-box-open", title: "Inventaris", desc: "Data sarana dan prasarana di dalam kelas." },
+            { id: "kas_kelas", name: "Kas Kelas", icon: "fa-money-bill-wave", title: "Kas Kelas", desc: "Manajemen keuangan dan kas kelas." },
             // Menu baru di atas pengaturan
             { id: "sync", name: "Kirim Data (Sync)", icon: "fa-cloud-upload-alt", title: "Sinkronisasi Server", desc: "Kirim data lokal aplikasi ini ke server sekolah." },
             { id: "pengaturan", name: "Pengaturan", icon: "fa-cog", title: "Pengaturan", desc: "Konfigurasi profil guru dan identitas kelas." }
@@ -7207,6 +7218,291 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             `;
         }
 
+        // --- Kas Kelas ---
+        function renderKasKelas() {
+            let k = db.kas_kelas;
+            if(!k.pembayaran) k.pembayaran = {};
+            if(!k.pengeluaran) k.pengeluaran = [];
+
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            let hariBerlalu = 0;
+            
+            let datesToCheck = [];
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        hariBerlalu++;
+                        datesToCheck.push(currentDate.toISOString().split('T')[0]);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            const totalHarusBayar = hariBerlalu * k.nominal;
+            let totalKeseluruhanBayar = 0;
+            let totalKeseluruhanKurang = 0;
+            let daftarTunggakanHtml = '';
+
+            let trs = db.students.map((s, index) => {
+                const bayarSiswa = k.pembayaran[s.id] || {};
+                let totalDibayarSiswa = 0;
+                let tanggalTunggakan = [];
+                
+                datesToCheck.forEach(date => {
+                    const bayarHariIni = bayarSiswa[date] || 0;
+                    totalDibayarSiswa += bayarHariIni;
+                    if(bayarHariIni < k.nominal) {
+                        tanggalTunggakan.push(`${date} (Kur. ${k.nominal - bayarHariIni})`);
+                    }
+                });
+                
+                // Tambahan jika ada pembayaran di luar tanggal aktif
+                const totalSemuaDibayar = Object.values(bayarSiswa).reduce((a,b)=>a+b, 0);
+                totalDibayarSiswa = totalSemuaDibayar; // Gunakan total aktual
+                
+                let kurang = totalHarusBayar - totalDibayarSiswa;
+                if(kurang < 0) kurang = 0;
+                
+                if (kurang > 0 && tanggalTunggakan.length > 0) {
+                    daftarTunggakanHtml += `<li class="mb-2"><span class="font-bold text-red-600">${s.name}</span>: Kurang Rp ${kurang.toLocaleString('id-ID')} <br><span class="text-xs text-gray-500">Tunggakan di: ${tanggalTunggakan.join(', ')}</span></li>`;
+                } else if (kurang > 0) {
+                    daftarTunggakanHtml += `<li class="mb-2"><span class="font-bold text-red-600">${s.name}</span>: Kurang Rp ${kurang.toLocaleString('id-ID')}</li>`;
+                }
+
+                totalKeseluruhanBayar += totalDibayarSiswa;
+                totalKeseluruhanKurang += kurang;
+
+                const defaultBayarToday = k.nominal;
+
+                return `
+                <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                    <td class="p-3 text-center text-sm">${index + 1}</td>
+                    <td class="p-3 text-sm font-medium">${s.name}</td>
+                    <td class="p-3">
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="input-bayar-${s.id}" class="w-24 border border-slate-300 rounded-lg p-1.5 text-sm outline-none focus:border-blue-500" value="${defaultBayarToday}">
+                            <button onclick="window.bayarKas('${s.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg shadow-sm transition">Bayar</button>
+                        </div>
+                    </td>
+                    <td class="p-3 text-sm text-green-700 font-bold text-right border-l border-slate-100">Rp ${totalDibayarSiswa.toLocaleString('id-ID')}</td>
+                    <td class="p-3 text-sm text-red-600 font-bold text-right">Rp ${kurang.toLocaleString('id-ID')}</td>
+                </tr>
+                `;
+            }).join('');
+
+            if(db.students.length === 0) {
+                trs = '<tr><td colspan="5" class="text-center p-8 text-slate-500 italic">Belum ada data siswa.</td></tr>';
+            }
+
+            let totalPengeluaran = 0;
+            let trsPengeluaran = k.pengeluaran.map(p => {
+                totalPengeluaran += p.nominal;
+                return `
+                <tr class="border-b border-slate-100">
+                    <td class="p-2 text-sm">${p.tgl}</td>
+                    <td class="p-2 text-sm">${p.keterangan}</td>
+                    <td class="p-2 text-sm text-right font-bold text-red-600">Rp ${p.nominal.toLocaleString('id-ID')}</td>
+                    <td class="p-2 text-center"><button onclick="window.hapusPengeluaranKas('${p.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+                </tr>
+                `;
+            }).join('');
+            
+            if(k.pengeluaran.length === 0) {
+                trsPengeluaran = '<tr><td colspan="4" class="text-center p-4 text-slate-500 italic">Belum ada pengeluaran.</td></tr>';
+            }
+
+            const saldoAkhir = totalKeseluruhanBayar - totalPengeluaran;
+
+            const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+            const cbHari = days.map(d => `
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <input type="checkbox" id="chk-hari-${d}" ${k.hari_aktif[d] ? 'checked' : ''} class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"> <span>${d}</span>
+                </label>
+            `).join('');
+
+            return `
+            <div class="space-y-6">
+                <!-- Pengaturan Kas -->
+                <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100">
+                    <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-cogs mr-2 text-slate-400"></i>Pengaturan Kas Kelas</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-5">
+                        <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Nominal Uang Kas (Rp)</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
+                                <input type="number" id="kas-nominal" value="${k.nominal}" class="pl-10 w-full border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-medium">
+                            </div>
+                        </div>
+                        <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Tanggal Mulai Berlaku</label>
+                            <input type="date" id="kas-tgl-mulai" value="${k.tanggal_mulai}" class="w-full border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-medium">
+                        </div>
+                        <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+                            <label class="block text-sm font-bold text-slate-700 mb-2">Hari Aktif Kas</label>
+                            <div class="flex flex-wrap gap-2">
+                                ${cbHari}
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="window.simpanPengaturanKas()" class="w-full sm:w-auto bg-gradient-to-r from-slate-800 to-slate-900 text-white px-6 py-2.5 rounded-xl shadow hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm font-bold"><i class="fas fa-save"></i> Simpan Pengaturan</button>
+                </div>
+
+                <!-- Tabel Pembayaran -->
+                <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 overflow-hidden">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
+                        <h2 class="text-lg font-bold text-slate-800"><i class="fas fa-users mr-2 text-blue-500"></i>Daftar Siswa & Pembayaran</h2>
+                        <div class="bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 text-sm font-medium text-slate-600">Total Hari Aktif Berlalu: <span class="text-blue-700 font-bold">${hariBerlalu} Hari</span></div>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 text-sm">
+                                <tr>
+                                    <th class="p-3 text-center w-12 font-bold">No</th>
+                                    <th class="p-3 font-bold">Nama Siswa</th>
+                                    <th class="p-3 font-bold w-48">Bayar (Rp)</th>
+                                    <th class="p-3 font-bold text-right border-l border-slate-200">Total Dibayar</th>
+                                    <th class="p-3 font-bold text-right">Jumlah Kurang</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${trs}
+                            </tbody>
+                            <tfoot class="bg-slate-100 border-t border-slate-300">
+                                <tr>
+                                    <td colspan="3" class="p-4 text-right font-bold text-slate-700">TOTAL KESELURUHAN</td>
+                                    <td class="p-4 text-right font-black text-green-700 text-base border-l border-slate-200">Rp ${totalKeseluruhanBayar.toLocaleString('id-ID')}</td>
+                                    <td class="p-4 text-right font-black text-red-600 text-base">Rp ${totalKeseluruhanKurang.toLocaleString('id-ID')}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Saldo & Pengeluaran -->
+                    <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
+                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-wallet mr-2 text-emerald-500"></i>Saldo Digunakan (Pengeluaran)</h2>
+                        
+                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-5 rounded-xl shadow-md text-white mb-6 flex justify-between items-center transform transition-transform hover:scale-[1.01]">
+                            <div>
+                                <div class="text-emerald-100 text-sm font-bold tracking-wider uppercase mb-1">Saldo Kas Saat Ini</div>
+                                <div class="text-3xl font-black">Rp ${saldoAkhir.toLocaleString('id-ID')}</div>
+                            </div>
+                            <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                                <i class="fas fa-coins text-2xl text-white"></i>
+                            </div>
+                        </div>
+
+                        <div class="border border-slate-200 rounded-xl overflow-hidden mb-5">
+                            <table class="w-full text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tgl</th>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Nominal</th>
+                                        <th class="p-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>${trsPengeluaran}</tbody>
+                                <tfoot class="bg-red-50 border-t border-red-100">
+                                    <tr>
+                                        <td colspan="2" class="p-3 text-right font-bold text-red-800 text-sm">Total Digunakan</td>
+                                        <td colspan="2" class="p-3 font-bold text-red-700 text-right text-base">Rp ${totalPengeluaran.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="mt-auto pt-5 border-t border-slate-100">
+                            <h4 class="text-sm font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle mr-1.5 text-blue-500"></i>Catat Pengeluaran Baru</h4>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="pengeluaran-ket" placeholder="Keterangan..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium">
+                                <input type="number" id="pengeluaran-nom" placeholder="Nominal (Rp)" class="w-full sm:w-32 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium">
+                                <button onclick="window.tambahPengeluaranKas()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daftar Tunggakan -->
+                    <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
+                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>Daftar Tunggakan Siswa</h2>
+                        <div class="bg-slate-50 flex-1 p-5 rounded-xl border border-slate-200 max-h-[420px] overflow-y-auto custom-scrollbar shadow-inner">
+                            ${daftarTunggakanHtml ? `<ul class="list-disc pl-5 text-sm space-y-3">${daftarTunggakanHtml}</ul>` : `<div class="h-full flex flex-col items-center justify-center text-emerald-600 py-10 font-bold"><div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-3"><i class="fas fa-check text-3xl"></i></div><p class="text-lg">Luar Biasa!</p><p class="text-emerald-500 font-medium text-sm">Tidak ada siswa yang menunggak kas.</p></div>`}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        window.simpanPengaturanKas = () => {
+            const nominal = parseInt(document.getElementById('kas-nominal').value) || 0;
+            const tglMulai = document.getElementById('kas-tgl-mulai').value;
+            const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+            
+            if(!db.kas_kelas) db.kas_kelas = {};
+            if(!db.kas_kelas.hari_aktif) db.kas_kelas.hari_aktif = {};
+
+            db.kas_kelas.nominal = nominal;
+            db.kas_kelas.tanggal_mulai = tglMulai;
+            days.forEach(d => {
+                db.kas_kelas.hari_aktif[d] = document.getElementById('chk-hari-' + d).checked;
+            });
+            
+            saveDB();
+            navigateTo('kas_kelas');
+            window.showAlert ? window.showAlert("Pengaturan kas kelas berhasil disimpan.") : alert("Tersimpan!");
+        };
+
+        window.bayarKas = (studentId) => {
+            const inputNom = document.getElementById('input-bayar-' + studentId);
+            const nominal = parseInt(inputNom.value);
+            if(isNaN(nominal) || nominal <= 0) {
+                alert("Masukkan nominal pembayaran yang valid!");
+                return;
+            }
+            
+            const dateToday = new Date().toISOString().split('T')[0];
+            if(!db.kas_kelas.pembayaran[studentId]) db.kas_kelas.pembayaran[studentId] = {};
+            
+            db.kas_kelas.pembayaran[studentId][dateToday] = (db.kas_kelas.pembayaran[studentId][dateToday] || 0) + nominal;
+            
+            saveDB();
+            navigateTo('kas_kelas'); 
+            inputNom.value = db.kas_kelas.nominal; 
+        };
+
+        window.tambahPengeluaranKas = () => {
+            const ket = document.getElementById('pengeluaran-ket').value.trim();
+            const nom = parseInt(document.getElementById('pengeluaran-nom').value);
+            
+            if(!ket || isNaN(nom) || nom <= 0) {
+                alert("Lengkapi keterangan dan nominal pengeluaran yang valid!");
+                return;
+            }
+            
+            db.kas_kelas.pengeluaran.push({
+                id: Date.now().toString(),
+                tgl: new Date().toLocaleDateString('id-ID'),
+                keterangan: ket,
+                nominal: nom
+            });
+            
+            saveDB();
+            navigateTo('kas_kelas');
+        };
+
+        window.hapusPengeluaranKas = (id) => {
+            if(confirm("Yakin menghapus pengeluaran ini?")) {
+                db.kas_kelas.pengeluaran = db.kas_kelas.pengeluaran.filter(p => p.id !== id);
+                saveDB();
+                navigateTo('kas_kelas');
+            }
+        };
+
         // --- 7. Navigation Router ---
         window.navigateTo = function(menuId, preventLoadMessages = false) {
             currentPage = menuId;
@@ -7301,6 +7597,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     case 'piket': contentHtml += renderPiket(); break;
                     case 'refleksi': contentHtml += renderRefleksi(); break;
                     case 'inventaris': contentHtml += renderInventaris(); break;
+                    case 'kas_kelas': contentHtml += renderKasKelas(); break;
                     case 'sync': contentHtml += renderSync(); break;
                     case 'pengaturan': contentHtml += renderPengaturan(); break;
                     default: contentHtml += `<div class="text-center p-10 text-gray-500">Modul belum tersedia.</div>`;
@@ -7466,8 +7763,8 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             }
             
             // Proses Migrasi Kunci Baru & Validasi Struktur (Selalu dijalankan)
-            ['mapel', 'jurnal', 'tugas', 'catatan', 'inventaris', 'jadwal', 'piket', 'nilai', 'pengaturan_nilai', 'libur_dates', 'pengaturan', 'refleksi_mingguan', 'pesan_info', 'struktur_organisasi'].forEach(k => {
-                if(!db[k]) db[k] = defaultData[k] || (k === 'nilai' || k === 'pengaturan_nilai' || k === 'libur_dates' ? {} : (k === 'pengaturan' ? {nama: window.currentUser ? window.currentUser.nama : '', nip: '-', sekolah: window.currentUser ? window.currentUser.sekolah : '', npsn: window.currentUser ? window.currentUser.npsn : ''} : (k === 'refleksi_mingguan' ? {emoji: '', teks: ''} : [])));
+            ['mapel', 'jurnal', 'tugas', 'catatan', 'inventaris', 'jadwal', 'piket', 'nilai', 'pengaturan_nilai', 'libur_dates', 'pengaturan', 'refleksi_mingguan', 'pesan_info', 'struktur_organisasi', 'kas_kelas'].forEach(k => {
+                if(!db[k]) db[k] = defaultData[k] || (k === 'nilai' || k === 'pengaturan_nilai' || k === 'libur_dates' ? {} : (k === 'pengaturan' ? {nama: window.currentUser ? window.currentUser.nama : '', nip: '-', sekolah: window.currentUser ? window.currentUser.sekolah : '', npsn: window.currentUser ? window.currentUser.npsn : ''} : (k === 'refleksi_mingguan' ? {emoji: '', teks: ''} : (k === 'kas_kelas' ? {nominal: 1000, tanggal_mulai: "2023-07-17", hari_aktif: {Senin: true, Selasa: true, Rabu: true, Kamis: true, Jumat: true, Sabtu: false, Minggu: false}, pengeluaran: [], pembayaran: {}} : []))));
             });
             if (Array.isArray(db.libur_dates)) {
                 let obj = {};
