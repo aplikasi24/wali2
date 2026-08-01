@@ -9327,7 +9327,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             text += `*Sisa Kurang: Rp ${sisaGlobal.toLocaleString('id-ID')}*\n\n`;
             text += `Terima kasih atas kerja samanya.`;
             
-            const waUrl = \`https://wa.me/?text=\${encodeURIComponent(text)}\`;
+            const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
             window.open(waUrl, '_blank');
         };
 
