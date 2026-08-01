@@ -7326,7 +7326,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     <td class="p-3">
                         <div class="flex items-center gap-2">
                             <span class="text-slate-400 font-bold text-xs">Rp</span>
-                            <input type="number" id="input-bayar-${s.id}" class="w-24 border border-slate-300 rounded-lg p-1.5 text-sm outline-none focus:border-blue-500 font-bold ${inputBgColor} ${inputTextColor}" value="${bayarViewed === 0 ? '' : bayarViewed}" onblur="window.updateBayarKas('${s.id}', '${viewedDateStr}', this.value)" placeholder="0">
+                            <input type="text" inputmode="numeric" id="input-bayar-${s.id}" class="w-24 border border-slate-300 rounded-lg p-1.5 text-sm outline-none focus:border-blue-500 font-bold ${inputBgColor} ${inputTextColor}" value="${bayarViewed === 0 ? '' : bayarViewed.toLocaleString('id-ID')}" oninput="window.formatInputRupiah(this)" onblur="window.updateBayarKas('${s.id}', '${viewedDateStr}', this.value)" placeholder="0">
                             <button onclick="window.updateBayarKas('${s.id}', '${viewedDateStr}', 0)" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-[10px] px-2 py-1.5 rounded-lg font-bold shadow-sm transition whitespace-nowrap" title="Tandai Belum Bayar">
                                 <i class="fas fa-times mr-1"></i>Blm Byr
                             </button>
@@ -7379,7 +7379,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                             <label class="block text-sm font-bold text-slate-700 mb-2">Nominal Uang Kas (Rp)</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">Rp</span>
-                                <input type="number" id="kas-nominal" value="${k.nominal}" onchange="window.simpanPengaturanKas()" class="pl-10 w-full border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-medium">
+                                <input type="text" inputmode="numeric" id="kas-nominal" value="${k.nominal ? k.nominal.toLocaleString('id-ID') : ''}" oninput="window.formatInputRupiah(this); window.simpanPengaturanKas()" class="pl-10 w-full border border-slate-300 rounded-xl p-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-medium">
                             </div>
                         </div>
                         <div class="bg-slate-50/50 p-4 rounded-xl border border-slate-100">
@@ -7473,7 +7473,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                             <h4 class="text-sm font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle mr-1.5 text-blue-500"></i>Catat Pengeluaran Baru</h4>
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <input type="text" id="pengeluaran-ket" placeholder="Keterangan..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium">
-                                <input type="number" id="pengeluaran-nom" placeholder="Nominal (Rp)" class="w-full sm:w-32 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium">
+                                <input type="text" inputmode="numeric" id="pengeluaran-nom" placeholder="Nominal (Rp)" class="w-full sm:w-32 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium" oninput="window.formatInputRupiah(this)">
                                 <button onclick="window.tambahPengeluaranKas()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
@@ -7530,8 +7530,18 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             };
         };
 
+        window.formatInputRupiah = (el) => {
+            let val = el.value.replace(/[^0-9]/g, '');
+            if (val !== '') {
+                el.value = parseInt(val, 10).toLocaleString('id-ID');
+            } else {
+                el.value = '';
+            }
+        };
+
         window.simpanPengaturanKas = () => {
-            const nominal = parseInt(document.getElementById('kas-nominal').value) || 0;
+            const nominalStr = document.getElementById('kas-nominal').value || '0';
+            const nominal = parseInt(nominalStr.replace(/\./g, '')) || 0;
             const tglMulai = document.getElementById('kas-tgl-mulai').value;
             const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
             
@@ -7571,7 +7581,8 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
         };
 
         window.updateBayarKas = (studentId, dateStr, valueStr) => {
-            let nominal = parseInt(valueStr) || 0;
+            const valueClean = String(valueStr).replace(/\./g, '');
+            let nominal = parseInt(valueClean) || 0;
             
             if(!db.kas_kelas.pembayaran[studentId]) db.kas_kelas.pembayaran[studentId] = {};
             
@@ -7587,7 +7598,8 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         window.tambahPengeluaranKas = () => {
             const ket = document.getElementById('pengeluaran-ket').value.trim();
-            const nom = parseInt(document.getElementById('pengeluaran-nom').value);
+            const nomStr = document.getElementById('pengeluaran-nom').value || '0';
+            const nom = parseInt(nomStr.replace(/\./g, ''));
             
             if(!ket || isNaN(nom) || nom <= 0) {
                 alert("Lengkapi keterangan dan nominal pengeluaran yang valid!");
