@@ -131,11 +131,12 @@
                 if (!sidebarNav) return;
                 sidebarNav.innerHTML = '';
                 
+                if (!db.pengaturan) db.pengaturan = {};
                 // Hitung unread pesan
                 if (db.pengaturan.read_pesan_count === undefined) {
-                    db.pengaturan.read_pesan_count = db.pesan_info.length;
+                    db.pengaturan.read_pesan_count = db.pesan_info ? db.pesan_info.length : 0;
                 }
-                const unreadCount = Math.max(0, db.pesan_info.length - db.pengaturan.read_pesan_count);
+                const unreadCount = Math.max(0, (db.pesan_info ? db.pesan_info.length : 0) - db.pengaturan.read_pesan_count);
 
                 appMenus.forEach(menu => {
                     try {
@@ -7220,6 +7221,15 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         // --- Kas Kelas ---
         function renderKasKelas() {
+            if (!db.kas_kelas) {
+                db.kas_kelas = {
+                    nominal: 10000,
+                    tanggal_mulai: '2026-07-13',
+                    hari_aktif: { 'Jumat': true },
+                    pembayaran: {},
+                    pengeluaran: []
+                };
+            }
             let k = db.kas_kelas;
             if(!k.pembayaran) k.pembayaran = {};
             if(!k.pengeluaran) k.pengeluaran = [];
