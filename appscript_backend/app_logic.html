@@ -9160,6 +9160,15 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                         
                         <h4 class="font-bold text-slate-700 text-sm mb-3 border-b border-slate-200 pb-2">Rincian Per Item:</h4>
                         ${rincianHtml}
+
+                        <div class="mt-4 pt-4 border-t border-slate-200 flex gap-2">
+                            <button onclick="window.cetakPDFRincianPK('${studentId}')" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2">
+                                <i class="fas fa-file-pdf"></i> Unduh PDF
+                            </button>
+                            <button onclick="window.shareWARincianPK('${studentId}')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2">
+                                <i class="fab fa-whatsapp text-lg"></i> Share Teks WA
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -9171,6 +9180,155 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 const modal = document.getElementById('modal-view-pk');
                 if(modal) { modal.classList.remove('opacity-0'); modal.children[0].classList.remove('scale-95'); }
             }, 10);
+        };
+
+        window.cetakPDFRincianPK = (studentId) => {
+            let pk = db.pembayaran_kelas;
+            const student = db.students.find(s => String(s.id) === String(studentId));
+            if(!student) return;
+
+            let totalHarus = 0;
+            let totalBayar = 0;
+            
+            let trs = pk.items.map((item, idx) => {
+                let nominal = parseInt(item.nominal);
+                let terbayar = (pk.transaksi[studentId] && pk.transaksi[studentId][item.id]) ? parseInt(pk.transaksi[studentId][item.id]) : 0;
+                let kurang = nominal - terbayar;
+                totalHarus += nominal;
+                totalBayar += terbayar;
+                
+                let status = kurang <= 0 ? 'LUNAS' : (terbayar > 0 ? 'CICIL' : 'BELUM BAYAR');
+
+                return `
+                <tr>
+                    <td style="border:1px solid #000; padding:8px; text-align:center;">${idx+1}</td>
+                    <td style="border:1px solid #000; padding:8px;">${item.name}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${nominal.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${terbayar.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:right;">Rp ${kurang.toLocaleString('id-ID')}</td>
+                    <td style="border:1px solid #000; padding:8px; text-align:center; font-weight:bold;">${status}</td>
+                </tr>
+                `;
+            }).join('');
+            
+            let sisaGlobal = totalHarus - totalBayar;
+
+            const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Rincian Tagihan - ${student.name}</title>
+                <style>
+                    body { font-family: 'Arial', sans-serif; color: #000; padding: 20px; font-size: 14px; }
+                    .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 25px; }
+                    .header h1 { font-size: 20px; margin: 0 0 5px 0; text-transform: uppercase; }
+                    .header p { margin: 5px 0; font-size: 14px; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px; }
+                    th { background-color: #f0f0f0; }
+                    .summary { width: 40%; float: right; }
+                    .summary table { font-size: 14px; font-weight: bold; }
+                    .clear { clear: both; }
+                    @media print {
+                        @page { margin: 1.5cm; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>RINCIAN TAGIHAN KELAS</h1>
+                    <p><strong>${db.pengaturan.sekolah || 'Nama Sekolah'}</strong></p>
+                    <p>Kelas: ${db.pengaturan.kelas || '-'} | Wali Kelas: ${db.pengaturan.nama || '-'}</p>
+                </div>
+                
+                <p><strong>Nama Siswa:</strong> ${student.name}</p>
+                <p><strong>Tanggal Cetak:</strong> ${new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</p>
+                
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="border:1px solid #000; padding:8px; width:40px;">No</th>
+                            <th style="border:1px solid #000; padding:8px;">Nama Tagihan</th>
+                            <th style="border:1px solid #000; padding:8px;">Tarif (Rp)</th>
+                            <th style="border:1px solid #000; padding:8px;">Terbayar (Rp)</th>
+                            <th style="border:1px solid #000; padding:8px;">Kekurangan (Rp)</th>
+                            <th style="border:1px solid #000; padding:8px;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${trs}
+                    </tbody>
+                </table>
+                
+                <div class="summary">
+                    <table style="width: 100%;">
+                        <tr>
+                            <td style="padding: 5px;">Total Tagihan</td>
+                            <td style="padding: 5px; text-align:right;">Rp ${totalHarus.toLocaleString('id-ID')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;">Total Terbayar</td>
+                            <td style="padding: 5px; text-align:right; color: green;">Rp ${totalBayar.toLocaleString('id-ID')}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; border-bottom: 2px solid #000;">Sisa Kekurangan</td>
+                            <td style="padding: 5px; text-align:right; border-bottom: 2px solid #000; color: red;">Rp ${sisaGlobal.toLocaleString('id-ID')}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="clear"></div>
+                
+                <script>
+                    window.onload = function() {
+                        window.print();
+                    }
+                </script>
+            </body>
+            </html>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+        };
+
+        window.shareWARincianPK = (studentId) => {
+            let pk = db.pembayaran_kelas;
+            const student = db.students.find(s => String(s.id) === String(studentId));
+            if(!student) return;
+
+            let totalHarus = 0;
+            let totalBayar = 0;
+            
+            let text = `*RINCIAN TAGIHAN KELAS*\n`;
+            text += `Nama: *${student.name}*\n`;
+            text += `Tanggal: ${new Date().toLocaleDateString('id-ID')}\n\n`;
+            
+            pk.items.forEach((item, idx) => {
+                let nominal = parseInt(item.nominal);
+                let terbayar = (pk.transaksi[studentId] && pk.transaksi[studentId][item.id]) ? parseInt(pk.transaksi[studentId][item.id]) : 0;
+                let kurang = nominal - terbayar;
+                totalHarus += nominal;
+                totalBayar += terbayar;
+                
+                let status = kurang <= 0 ? 'LUNAS ✅' : (terbayar > 0 ? 'CICIL ⚠️' : 'BELUM BAYAR ❌');
+                
+                text += `${idx+1}. *${item.name}*\n`;
+                text += `   Tagihan: Rp ${nominal.toLocaleString('id-ID')}\n`;
+                text += `   Dibayar: Rp ${terbayar.toLocaleString('id-ID')}\n`;
+                if(kurang > 0) text += `   Kurang: Rp ${kurang.toLocaleString('id-ID')}\n`;
+                text += `   Status: ${status}\n\n`;
+            });
+            
+            let sisaGlobal = totalHarus - totalBayar;
+            
+            text += `*TOTAL KESELURUHAN*\n`;
+            text += `Tagihan: Rp ${totalHarus.toLocaleString('id-ID')}\n`;
+            text += `Terbayar: Rp ${totalBayar.toLocaleString('id-ID')}\n`;
+            text += `*Sisa Kurang: Rp ${sisaGlobal.toLocaleString('id-ID')}*\n\n`;
+            text += `Terima kasih atas kerja samanya.`;
+            
+            const waUrl = \`https://wa.me/?text=\${encodeURIComponent(text)}\`;
+            window.open(waUrl, '_blank');
         };
 
         // Global Real-time Clock Updater
