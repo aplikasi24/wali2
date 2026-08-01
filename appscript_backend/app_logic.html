@@ -7519,7 +7519,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     <td class="p-2 text-sm">${p.tgl}</td>
                     <td class="p-2 text-sm">${p.keterangan}</td>
                     <td class="p-2 text-sm text-right font-bold text-red-600">Rp ${p.nominal.toLocaleString('id-ID')}</td>
-                    <td class="p-2 text-center"><button onclick="window.hapusPengeluaranKas('${p.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+                    <td class="p-2 text-center">
+                        <button onclick="window.editPengeluaranKas('${p.id}')" class="text-yellow-500 hover:text-yellow-700 mr-2" title="Edit Nominal"><i class="fas fa-pencil-alt"></i></button>
+                        <button onclick="window.hapusPengeluaranKas('${p.id}')" class="text-red-500 hover:text-red-700" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </td>
                 </tr>
                 `;
             }).join('');
@@ -7582,7 +7585,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     <td class="p-2 text-sm">${p.tgl}</td>
                     <td class="p-2 text-sm">${p.keterangan}</td>
                     <td class="p-2 text-sm text-right font-bold text-blue-600">Rp ${p.nominal.toLocaleString('id-ID')}</td>
-                    <td class="p-2 text-center"><button onclick="window.hapusPemasukanKas('${p.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+                    <td class="p-2 text-center">
+                        <button onclick="window.editPemasukanKas('${p.id}')" class="text-yellow-500 hover:text-yellow-700 mr-2" title="Edit Nominal"><i class="fas fa-pencil-alt"></i></button>
+                        <button onclick="window.hapusPemasukanKas('${p.id}')" class="text-red-500 hover:text-red-700" title="Hapus"><i class="fas fa-trash"></i></button>
+                    </td>
                 </tr>
                 `;
             }).join('');
@@ -8030,8 +8036,8 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                         </select>
                         
                         <div class="flex flex-col gap-3">
-                            <button onclick="window.downloadKasCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
-                                <i class="fas fa-file-excel text-lg"></i> Unduh Excel (CSV)
+                            <button onclick="window.downloadKasExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+                                <i class="fas fa-file-excel text-lg"></i> Unduh Excel (XLSX)
                             </button>
                             <button onclick="window.cetakKasPDF()" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
                                 <i class="fas fa-file-pdf text-lg"></i> Cetak PDF
@@ -8055,9 +8061,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             }, 10);
         };
 
-        window.downloadKasCSV = () => {
+        window.downloadKasExcel = () => {
             const select = document.getElementById('kas-download-month');
             const monthKey = select.value;
+            const monthName = select.options[select.selectedIndex].text;
             if (!monthKey) return alert('Bulan belum dipilih atau tidak ada data.');
             
             const k = db.kas_kelas;
@@ -8077,44 +8084,79 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 }
             }
 
-            let csvContent = "REKAP PEMBAYARAN KAS KELAS\\n";
-            csvContent += "Bulan: " + select.options[select.selectedIndex].text + "\\n\\n";
-            
-            let headerRow = ["No", "Nama Siswa"];
-            datesToCheck.forEach(d => {
-                let [yyyy, mm, dd] = d.split('-');
-                headerRow.push(`${dd}/${mm}`);
-            });
-            headerRow.push("Total Dibayar");
-            csvContent += headerRow.join(";") + "\\n";
-            
+            const wb = XLSX.utils.book_new();
+
+            const parseDateStrToYYYYMMDD = (dStr) => {
+                if (dStr.includes('/')) {
+                    let parts = dStr.split('/');
+                    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+                return dStr;
+            };
+
+            // 1. Sheet Pembayaran (Daftar Siswa)
+            let dataPembayaran = [];
             let totalBulanIniSiswa = 0;
             db.students.forEach((s, idx) => {
-                let row = [idx + 1, `"${s.name}"`];
+                let row = { "No": idx + 1, "Nama Siswa": s.name };
                 let totalSiswa = 0;
                 datesToCheck.forEach(d => {
+                    let [yyyy, mm, dd] = d.split('-');
                     let byr = (k.pembayaran[s.id] && k.pembayaran[s.id][d]) !== undefined ? k.pembayaran[s.id][d] : 0;
-                    row.push(byr);
+                    row[`${dd}/${mm}`] = byr > 0 ? byr : '';
                     totalSiswa += byr;
                 });
-                row.push(totalSiswa);
+                row["Total Dibayar"] = totalSiswa;
                 totalBulanIniSiswa += totalSiswa;
-                csvContent += row.join(";") + "\\n";
+                dataPembayaran.push(row);
             });
-            csvContent += `TOTAL KESELURUHAN PEMBAYARAN;;${Array(datesToCheck.length).fill('').join(';')};${totalBulanIniSiswa}\\n\\n\\n`;
-
-            csvContent += "REKAP PENGELUARAN KAS KELAS\\n\\n";
-            csvContent += "Tanggal;Keterangan;Nominal\\n";
             
+            let rowTotal = { "No": "", "Nama Siswa": "TOTAL KESELURUHAN" };
+            datesToCheck.forEach(d => {
+                let [yyyy, mm, dd] = d.split('-');
+                rowTotal[`${dd}/${mm}`] = "";
+            });
+            rowTotal["Total Dibayar"] = totalBulanIniSiswa;
+            dataPembayaran.push(rowTotal);
+
+            const wsPembayaran = XLSX.utils.json_to_sheet(dataPembayaran);
+            let colWidths = [{wch: 5}, {wch: 30}];
+            datesToCheck.forEach(() => colWidths.push({wch: 10}));
+            colWidths.push({wch: 15});
+            wsPembayaran['!cols'] = colWidths;
+            XLSX.utils.book_append_sheet(wb, wsPembayaran, "Pembayaran Kas");
+
+            // 2. Sheet Pemasukan Lain
+            let dataPemasukan = [];
+            let totalPemasukanLain = 0;
+            (k.pemasukan_lain || []).forEach(p => {
+                const normTgl = parseDateStrToYYYYMMDD(p.tgl);
+                if (normTgl.startsWith(monthKey)) {
+                    dataPemasukan.push({ "Tanggal": normTgl, "Keterangan": p.keterangan, "Nominal": p.nominal });
+                    totalPemasukanLain += p.nominal;
+                }
+            });
+            dataPemasukan.push({ "Tanggal": "", "Keterangan": "TOTAL PEMASUKAN LAIN", "Nominal": totalPemasukanLain });
+            const wsPemasukan = XLSX.utils.json_to_sheet(dataPemasukan);
+            wsPemasukan['!cols'] = [{wch: 15}, {wch: 40}, {wch: 15}];
+            XLSX.utils.book_append_sheet(wb, wsPemasukan, "Pemasukan Lain");
+
+            // 3. Sheet Pengeluaran
+            let dataPengeluaran = [];
             let pengeluaranBulanIni = 0;
             k.pengeluaran.forEach(p => {
-                if (p.tgl.startsWith(monthKey)) {
-                    csvContent += `${p.tgl};"${p.keterangan}";${p.nominal}\\n`;
+                const normTgl = parseDateStrToYYYYMMDD(p.tgl);
+                if (normTgl.startsWith(monthKey)) {
+                    dataPengeluaran.push({ "Tanggal": normTgl, "Keterangan": p.keterangan, "Nominal": p.nominal });
                     pengeluaranBulanIni += p.nominal;
                 }
             });
-            csvContent += `TOTAL PENGELUARAN;;${pengeluaranBulanIni}\\n\\n\\n`;
+            dataPengeluaran.push({ "Tanggal": "", "Keterangan": "TOTAL PENGELUARAN", "Nominal": pengeluaranBulanIni });
+            const wsPengeluaran = XLSX.utils.json_to_sheet(dataPengeluaran);
+            wsPengeluaran['!cols'] = [{wch: 15}, {wch: 40}, {wch: 15}];
+            XLSX.utils.book_append_sheet(wb, wsPengeluaran, "Pengeluaran");
 
+            // 4. Sheet Ringkasan Saldo
             let totalBayarAllTime = 0, totalBayarBefore = 0;
             db.students.forEach(s => {
                 if(k.pembayaran[s.id]) {
@@ -8128,29 +8170,35 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             
             let totalKeluarAllTime = 0, totalKeluarBefore = 0;
             k.pengeluaran.forEach(p => {
+                const normTgl = parseDateStrToYYYYMMDD(p.tgl);
                 totalKeluarAllTime += p.nominal;
-                if (p.tgl < monthKey + "-01") totalKeluarBefore += p.nominal;
+                if (normTgl < monthKey + "-01") totalKeluarBefore += p.nominal;
             });
             
-            let saldoAwalBulan = totalBayarBefore - totalKeluarBefore;
-            let saldoAkhirBulan = saldoAwalBulan + totalBulanIniSiswa - pengeluaranBulanIni;
-            let saldoRiilSaatIni = totalBayarAllTime - totalKeluarAllTime;
+            let totalMasukLainAllTime = 0, totalMasukLainBefore = 0;
+            (k.pemasukan_lain || []).forEach(p => {
+                const normTgl = parseDateStrToYYYYMMDD(p.tgl);
+                totalMasukLainAllTime += p.nominal;
+                if (normTgl < monthKey + "-01") totalMasukLainBefore += p.nominal;
+            });
 
-            csvContent += "REKAP SALDO KAS\\n\\n";
-            csvContent += `Saldo Awal Bulan (sebelum ${monthKey});${saldoAwalBulan}\\n`;
-            csvContent += `Total Pemasukan Bulan Ini;${totalBulanIniSiswa}\\n`;
-            csvContent += `Total Pengeluaran Bulan Ini;${pengeluaranBulanIni}\\n`;
-            csvContent += `Saldo Akhir Bulan Ini;${saldoAkhirBulan}\\n`;
-            csvContent += `Saldo Kas Saat Ini (Keseluruhan);${saldoRiilSaatIni}\\n`;
+            let saldoAwalBulan = (totalBayarBefore + totalMasukLainBefore) - totalKeluarBefore;
+            let saldoAkhirBulan = saldoAwalBulan + totalBulanIniSiswa + totalPemasukanLain - pengeluaranBulanIni;
+            let saldoRiilSaatIni = (totalBayarAllTime + totalMasukLainAllTime) - totalKeluarAllTime;
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", `Rekap_Kas_Kelas_${monthKey}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            let dataRingkasan = [
+                { "Keterangan": `Saldo Awal Bulan (sebelum ${monthName})`, "Nominal": saldoAwalBulan },
+                { "Keterangan": "Total Pembayaran Kas Bulan Ini", "Nominal": totalBulanIniSiswa },
+                { "Keterangan": "Total Pemasukan Lain Bulan Ini", "Nominal": totalPemasukanLain },
+                { "Keterangan": "Total Pengeluaran Bulan Ini", "Nominal": pengeluaranBulanIni },
+                { "Keterangan": "Saldo Akhir Bulan Ini", "Nominal": saldoAkhirBulan },
+                { "Keterangan": "Saldo Kas Saat Ini (Keseluruhan)", "Nominal": saldoRiilSaatIni }
+            ];
+            const wsRingkasan = XLSX.utils.json_to_sheet(dataRingkasan);
+            wsRingkasan['!cols'] = [{wch: 40}, {wch: 20}];
+            XLSX.utils.book_append_sheet(wb, wsRingkasan, "Ringkasan Saldo");
+
+            XLSX.writeFile(wb, `Rekap_Kas_Kelas_${monthKey}.xlsx`);
             document.getElementById('modal-download-kas').remove();
         };
 
@@ -8448,7 +8496,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             
             db.kas_kelas.pengeluaran.push({
                 id: Date.now().toString(),
-                tgl: new Date().toLocaleDateString('id-ID'),
+                tgl: new Date().toLocaleDateString('en-CA'),
                 keterangan: ket,
                 nominal: nom
             });
@@ -8467,6 +8515,24 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     navigateTo('kas_kelas');
                 }
             );
+        };
+
+        window.editPengeluaranKas = (id) => {
+            const index = db.kas_kelas.pengeluaran.findIndex(p => p.id === id);
+            if (index !== -1) {
+                const item = db.kas_kelas.pengeluaran[index];
+                const newNomStr = prompt(`Masukkan nominal baru untuk pengeluaran "${item.keterangan}":`, item.nominal);
+                if (newNomStr !== null) {
+                    const newNom = parseInt(newNomStr.replace(/\./g, ''));
+                    if (!isNaN(newNom) && newNom > 0) {
+                        db.kas_kelas.pengeluaran[index].nominal = newNom;
+                        saveDB();
+                        navigateTo('kas_kelas');
+                    } else {
+                        alert("Nominal tidak valid!");
+                    }
+                }
+            }
         };
 
         window.setPengeluaranPerPage = (val) => {
@@ -8492,7 +8558,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             
             db.kas_kelas.pemasukan_lain.push({
                 id: Date.now().toString(),
-                tgl: new Date().toLocaleDateString('id-ID'),
+                tgl: new Date().toLocaleDateString('en-CA'),
                 keterangan: ket,
                 nominal: nom
             });
@@ -8511,6 +8577,24 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     navigateTo('kas_kelas');
                 }
             );
+        };
+
+        window.editPemasukanKas = (id) => {
+            const index = db.kas_kelas.pemasukan_lain.findIndex(p => p.id === id);
+            if (index !== -1) {
+                const item = db.kas_kelas.pemasukan_lain[index];
+                const newNomStr = prompt(`Masukkan nominal baru untuk pemasukan "${item.keterangan}":`, item.nominal);
+                if (newNomStr !== null) {
+                    const newNom = parseInt(newNomStr.replace(/\./g, ''));
+                    if (!isNaN(newNom) && newNom > 0) {
+                        db.kas_kelas.pemasukan_lain[index].nominal = newNom;
+                        saveDB();
+                        navigateTo('kas_kelas');
+                    } else {
+                        alert("Nominal tidak valid!");
+                    }
+                }
+            }
         };
 
         window.setPemasukanPerPage = (val) => {
