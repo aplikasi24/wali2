@@ -7648,7 +7648,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         // --- 7. Navigation Router ---
         window.navigateTo = function(menuId, preventLoadMessages = false) {
-            currentPage = menuId;
+            const isSamePage = (window.currentPage === menuId);
+            const currentScrollPos = typeof mainScrollArea !== 'undefined' ? mainScrollArea.scrollTop : 0;
+            
+            window.currentPage = menuId;
             try {
                 localStorage.setItem('mwk_lastMenu', menuId);
             } catch(e) {}
@@ -7761,7 +7764,12 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 alert("Kesalahan Sistem: Elemen #app-content tidak ditemukan!");
             }
             
-            mainScrollArea.scrollTop = 0;
+            if (isSamePage && typeof mainScrollArea !== 'undefined') {
+                mainScrollArea.scrollTop = currentScrollPos;
+                requestAnimationFrame(() => mainScrollArea.scrollTop = currentScrollPos);
+            } else if (typeof mainScrollArea !== 'undefined') {
+                mainScrollArea.scrollTop = 0;
+            }
             
             if (menuId === 'dashboard') {
                 setTimeout(() => {
