@@ -7368,6 +7368,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             let k = db.kas_kelas;
             if(!k.pembayaran) k.pembayaran = {};
             if(!k.pengeluaran) k.pengeluaran = [];
+            if(!k.pemasukan_lain) k.pemasukan_lain = [];
 
             const tglMulai = new Date(k.tanggal_mulai);
             const hariIni = new Date();
@@ -7550,7 +7551,70 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 `;
             }
 
-            const saldoAkhir = totalKeseluruhanBayar - totalPengeluaran;
+            // --- Pemasukan Lain ---
+            if (typeof window.pemasukanPage === 'undefined') window.pemasukanPage = 1;
+            if (typeof window.pemasukanPerPage === 'undefined') window.pemasukanPerPage = 10;
+            
+            let totalPemasukanLain = 0;
+            k.pemasukan_lain.forEach(p => totalPemasukanLain += p.nominal);
+
+            let dataPemasukan = k.pemasukan_lain.map((p, index) => ({
+                ...p,
+                no: index + 1
+            })).reverse();
+            let totalPagesPemasukan = 1;
+            
+            if (window.pemasukanPerPage !== 'semua') {
+                let limit = parseInt(window.pemasukanPerPage);
+                totalPagesPemasukan = Math.ceil(dataPemasukan.length / limit) || 1;
+                
+                if (window.pemasukanPage > totalPagesPemasukan) window.pemasukanPage = totalPagesPemasukan;
+                if (window.pemasukanPage < 1) window.pemasukanPage = 1;
+                
+                const startIndex = (window.pemasukanPage - 1) * limit;
+                dataPemasukan = dataPemasukan.slice(startIndex, startIndex + limit);
+            }
+
+            let trsPemasukan = dataPemasukan.map(p => {
+                return `
+                <tr class="border-b border-slate-100">
+                    <td class="p-2 text-sm text-center text-slate-500 font-bold">${p.no}</td>
+                    <td class="p-2 text-sm">${p.tgl}</td>
+                    <td class="p-2 text-sm">${p.keterangan}</td>
+                    <td class="p-2 text-sm text-right font-bold text-blue-600">Rp ${p.nominal.toLocaleString('id-ID')}</td>
+                    <td class="p-2 text-center"><button onclick="window.hapusPemasukanKas('${p.id}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button></td>
+                </tr>
+                `;
+            }).join('');
+            
+            if(k.pemasukan_lain.length === 0) {
+                trsPemasukan = '<tr><td colspan="5" class="text-center p-4 text-slate-500 italic">Belum ada pemasukan lain.</td></tr>';
+            }
+            
+            let paginationPemasukanHtml = '';
+            if (k.pemasukan_lain.length > 10 || window.pemasukanPerPage !== 10) {
+                paginationPemasukanHtml = `
+                <div class="flex flex-col sm:flex-row justify-between items-center bg-slate-50 border-t border-slate-200 p-3 gap-3">
+                    <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+                        Tampilkan:
+                        <select onchange="window.setPemasukanPerPage(this.value)" class="border border-slate-300 rounded-lg px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white">
+                            <option value="10" ${window.pemasukanPerPage == 10 ? 'selected' : ''}>10</option>
+                            <option value="20" ${window.pemasukanPerPage == 20 ? 'selected' : ''}>20</option>
+                            <option value="semua" ${window.pemasukanPerPage === 'semua' ? 'selected' : ''}>Semua</option>
+                        </select>
+                    </div>
+                    ${window.pemasukanPerPage !== 'semua' ? `
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.navigasiPemasukanPage(-1)" ${window.pemasukanPage <= 1 ? 'disabled' : ''} class="px-2 py-1 bg-white border border-slate-300 text-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition shadow-sm"><i class="fas fa-chevron-left"></i></button>
+                        <span class="text-sm font-bold text-slate-700 mx-1">Hal ${window.pemasukanPage} dari ${totalPagesPemasukan}</span>
+                        <button onclick="window.navigasiPemasukanPage(1)" ${window.pemasukanPage >= totalPagesPemasukan ? 'disabled' : ''} class="px-2 py-1 bg-white border border-slate-300 text-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition shadow-sm"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    ` : ''}
+                </div>
+                `;
+            }
+
+            const saldoAkhir = totalKeseluruhanBayar + totalPemasukanLain - totalPengeluaran;
 
             const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
             const cbHari = days.map(d => `
@@ -7628,21 +7692,57 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Saldo & Pengeluaran -->
+                <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-6 rounded-2xl shadow-lg text-white mb-6 flex justify-between items-center transform transition-transform hover:scale-[1.01]">
+                    <div>
+                        <div class="text-emerald-100 text-sm font-bold tracking-wider uppercase mb-1">Saldo Kas Saat Ini</div>
+                        <div class="text-4xl font-black">Rp ${saldoAkhir.toLocaleString('id-ID')}</div>
+                    </div>
+                    <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner shrink-0">
+                        <i class="fas fa-coins text-3xl text-white"></i>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Pemasukan Lain -->
                     <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
-                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-wallet mr-2 text-emerald-500"></i>Saldo Digunakan (Pengeluaran)</h2>
+                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-hand-holding-usd mr-2 text-blue-500"></i>Pemasukan Lain</h2>
                         
-                        <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-5 rounded-xl shadow-md text-white mb-6 flex justify-between items-center transform transition-transform hover:scale-[1.01]">
-                            <div>
-                                <div class="text-emerald-100 text-sm font-bold tracking-wider uppercase mb-1">Saldo Kas Saat Ini</div>
-                                <div class="text-3xl font-black">Rp ${saldoAkhir.toLocaleString('id-ID')}</div>
-                            </div>
-                            <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                                <i class="fas fa-coins text-2xl text-white"></i>
-                            </div>
+                        <div class="border border-slate-200 rounded-xl overflow-x-auto mb-5" style="-webkit-overflow-scrolling: touch;">
+                            <table class="w-full text-left whitespace-nowrap min-w-max" style="touch-action: pan-x pan-y;">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-center w-10">No</th>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tgl</th>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Keterangan</th>
+                                        <th class="p-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Nominal</th>
+                                        <th class="p-3"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>${trsPemasukan}</tbody>
+                                <tfoot class="bg-blue-50 border-t border-blue-100">
+                                    <tr>
+                                        <td colspan="3" class="p-3 text-right font-bold text-blue-800 text-sm">Total Pemasukan Lain</td>
+                                        <td colspan="2" class="p-3 font-bold text-blue-700 text-right text-base">Rp ${totalPemasukanLain.toLocaleString('id-ID')}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            ${paginationPemasukanHtml}
                         </div>
 
+                        <div class="mt-auto pt-5 border-t border-slate-100">
+                            <h4 class="text-sm font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle mr-1.5 text-blue-500"></i>Catat Pemasukan Baru</h4>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="pemasukan-ket" placeholder="Keterangan (misal: Infaq)..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 font-medium">
+                                <input type="text" inputmode="numeric" id="pemasukan-nom" placeholder="Nominal (Rp)" class="w-full sm:w-32 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 font-medium" oninput="window.formatInputRupiah(this)">
+                                <button onclick="window.tambahPemasukanKas()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Saldo & Pengeluaran -->
+                    <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
+                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-shopping-cart mr-2 text-emerald-500"></i>Saldo Digunakan (Pengeluaran)</h2>
+                        
                         <div class="border border-slate-200 rounded-xl overflow-x-auto mb-5" style="-webkit-overflow-scrolling: touch;">
                             <table class="w-full text-left whitespace-nowrap min-w-max" style="touch-action: pan-x pan-y;">
                                 <thead class="bg-slate-50 border-b border-slate-200">
@@ -7666,7 +7766,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                         </div>
 
                         <div class="mt-auto pt-5 border-t border-slate-100">
-                            <h4 class="text-sm font-bold text-slate-700 mb-3"><i class="fas fa-plus-circle mr-1.5 text-blue-500"></i>Catat Pengeluaran Baru</h4>
+                            <h4 class="text-sm font-bold text-slate-700 mb-3"><i class="fas fa-minus-circle mr-1.5 text-emerald-500"></i>Catat Pengeluaran Baru</h4>
                             <div class="flex flex-col sm:flex-row gap-2">
                                 <input type="text" id="pengeluaran-ket" placeholder="Keterangan..." class="flex-1 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium">
                                 <input type="text" inputmode="numeric" id="pengeluaran-nom" placeholder="Nominal (Rp)" class="w-full sm:w-32 border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 font-medium" oninput="window.formatInputRupiah(this)">
@@ -7674,13 +7774,13 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Daftar Tunggakan -->
-                    <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
-                        <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>Daftar Tunggakan Siswa</h2>
-                        <div class="bg-slate-50 flex-1 p-5 rounded-xl border border-slate-200 max-h-[420px] overflow-y-auto custom-scrollbar shadow-inner">
-                            ${daftarTunggakanHtml ? `<ul class="list-disc pl-5 text-sm space-y-3">${daftarTunggakanHtml}</ul>` : `<div class="h-full flex flex-col items-center justify-center text-emerald-600 py-10 font-bold"><div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-3"><i class="fas fa-check text-3xl"></i></div><p class="text-lg">Luar Biasa!</p><p class="text-emerald-500 font-medium text-sm">Tidak ada siswa yang menunggak kas.</p></div>`}
-                        </div>
+                <!-- Daftar Tunggakan -->
+                <div class="bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-slate-100 flex flex-col">
+                    <h2 class="text-lg font-bold text-slate-800 mb-5"><i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>Daftar Tunggakan Siswa</h2>
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 max-h-[420px] overflow-y-auto custom-scrollbar shadow-inner">
+                        ${daftarTunggakanHtml ? `<ul class="list-disc pl-5 text-sm space-y-3">${daftarTunggakanHtml}</ul>` : `<div class="h-full flex flex-col items-center justify-center text-emerald-600 py-10 font-bold"><div class="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-3"><i class="fas fa-check text-3xl"></i></div><p class="text-lg">Luar Biasa!</p><p class="text-emerald-500 font-medium text-sm">Tidak ada siswa yang menunggak kas.</p></div>`}
                     </div>
                 </div>
             </div>
@@ -8377,6 +8477,50 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
 
         window.navigasiPengeluaranPage = (dir) => {
             window.pengeluaranPage += dir;
+            navigateTo('kas_kelas');
+        };
+
+        window.tambahPemasukanKas = () => {
+            const ket = document.getElementById('pemasukan-ket').value.trim();
+            const nomStr = document.getElementById('pemasukan-nom').value || '0';
+            const nom = parseInt(nomStr.replace(/\./g, ''));
+            
+            if(!ket || isNaN(nom) || nom <= 0) {
+                alert("Lengkapi keterangan dan nominal pemasukan yang valid!");
+                return;
+            }
+            
+            db.kas_kelas.pemasukan_lain.push({
+                id: Date.now().toString(),
+                tgl: new Date().toLocaleDateString('id-ID'),
+                keterangan: ket,
+                nominal: nom
+            });
+            
+            saveDB();
+            navigateTo('kas_kelas');
+        };
+
+        window.hapusPemasukanKas = (id) => {
+            window.showModernConfirm(
+                "Yakin mau menghapus riwayat pemasukan ini?",
+                '<span class="text-5xl">💰</span>',
+                () => {
+                    db.kas_kelas.pemasukan_lain = db.kas_kelas.pemasukan_lain.filter(p => p.id !== id);
+                    saveDB();
+                    navigateTo('kas_kelas');
+                }
+            );
+        };
+
+        window.setPemasukanPerPage = (val) => {
+            window.pemasukanPerPage = val;
+            window.pemasukanPage = 1;
+            navigateTo('kas_kelas');
+        };
+
+        window.navigasiPemasukanPage = (dir) => {
+            window.pemasukanPage += dir;
             navigateTo('kas_kelas');
         };
 
