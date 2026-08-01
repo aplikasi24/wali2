@@ -7531,11 +7531,28 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
         };
 
         window.formatInputRupiah = (el) => {
-            let val = el.value.replace(/[^0-9]/g, '');
+            const originalValue = el.value;
+            let val = originalValue.replace(/[^0-9]/g, '');
+            let formatted = '';
+            
             if (val !== '') {
-                el.value = parseInt(val, 10).toLocaleString('id-ID');
-            } else {
-                el.value = '';
+                formatted = parseInt(val, 10).toLocaleString('id-ID');
+            }
+            
+            if (originalValue !== formatted) {
+                let cursorPosition = el.selectionStart || 0;
+                let originalLen = originalValue.length;
+                
+                el.value = formatted;
+                
+                let newLen = formatted.length;
+                cursorPosition += (newLen - originalLen);
+                
+                if (el.setSelectionRange) {
+                    try {
+                        el.setSelectionRange(cursorPosition, cursorPosition);
+                    } catch(e) {}
+                }
             }
         };
 
