@@ -139,19 +139,31 @@
                 }
                 const unreadCount = Math.max(0, (db.pesan_info ? db.pesan_info.length : 0) - db.pengaturan.read_pesan_count);
 
-                appMenus.forEach(menu => {
+                const hasChildren = sidebarNav.children.length > 0;
+                if (!hasChildren) {
+                    sidebarNav.innerHTML = '';
+                }
+
+                appMenus.forEach((menu, index) => {
                     try {
                         const isActive = menu.id === currentPage;
-                        const link = document.createElement('a');
-                        link.href = "#";
-                        link.onclick = (e) => {
-                            e.preventDefault();
-                            if(menu.id === 'pesan') {
-                                db.pengaturan.read_pesan_count = db.pesan_info.length;
-                                saveDB();
-                            }
-                            window.navigateTo(menu.id);
-                        };
+                        let link;
+                        
+                        if (hasChildren && sidebarNav.children[index]) {
+                            link = sidebarNav.children[index];
+                        } else {
+                            link = document.createElement('a');
+                            link.href = "#";
+                            link.onclick = (e) => {
+                                e.preventDefault();
+                                if(menu.id === 'pesan') {
+                                    db.pengaturan.read_pesan_count = db.pesan_info.length;
+                                    saveDB();
+                                }
+                                window.navigateTo(menu.id);
+                            };
+                            sidebarNav.appendChild(link);
+                        }
                         
                         let menuNameHtml = menu.name;
                         if(menu.id === 'pesan' && unreadCount > 0) {
@@ -160,7 +172,7 @@
                         
                         if (isActive) {
                             link.className = "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30 group transform scale-[1.02]";
-                            link.innerHTML = '<div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0"><i class="fas ' + menu.icon + ' text-sm"></i></div><span class="font-bold text-sm tracking-wide flex-1 flex items-center">' + menuNameHtml + '</span>';
+                            link.innerHTML = '<div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0 transition-colors duration-300"><i class="fas ' + menu.icon + ' text-sm"></i></div><span class="font-bold text-sm tracking-wide flex-1 flex items-center transition-colors duration-300">' + menuNameHtml + '</span>';
                         } else {
                             link.className = "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 text-slate-400 hover:bg-slate-800/80 hover:text-orange-400 group hover:translate-x-1 cursor-pointer";
                             
@@ -169,9 +181,8 @@
                                 link.className += " mt-6 border-t border-slate-800 pt-4 rounded-none hover:translate-x-0";
                             }
                             
-                            link.innerHTML = '<div class="w-8 h-8 rounded-lg bg-slate-800 group-hover:bg-orange-500/20 flex items-center justify-center shrink-0 transition-colors"><i class="fas ' + menu.icon + ' text-sm text-slate-500 group-hover:text-orange-400 transition-colors"></i></div><span class="font-medium text-sm flex-1 flex items-center">' + menuNameHtml + '</span>';
+                            link.innerHTML = '<div class="w-8 h-8 rounded-lg bg-slate-800 group-hover:bg-orange-500/20 flex items-center justify-center shrink-0 transition-colors duration-300"><i class="fas ' + menu.icon + ' text-sm text-slate-500 group-hover:text-orange-400 transition-colors duration-300"></i></div><span class="font-medium text-sm flex-1 flex items-center transition-colors duration-300">' + menuNameHtml + '</span>';
                         }
-                        sidebarNav.appendChild(link);
                     } catch (errInner) {
                         console.error('Error menu:', menu, errInner);
                     }
@@ -193,25 +204,36 @@
         function renderBottomNav() {
             const nav = document.getElementById('bottom-nav');
             if (!nav) return;
-            nav.innerHTML = '';
-            bottomNavMenus.forEach(menu => {
-                const btn = document.createElement('button');
+            
+            const hasChildren = nav.children.length > 0;
+            if (!hasChildren) {
+                nav.innerHTML = '';
+            }
+
+            bottomNavMenus.forEach((menu, index) => {
                 const isActive = (menu.id !== 'menu') && (currentPage === menu.id);
-                btn.className = 'flex flex-col items-center justify-center flex-1 min-w-0 py-1 gap-0.5 transition-colors ' +
+                let btn;
+
+                if (hasChildren && nav.children[index]) {
+                    btn = nav.children[index];
+                } else {
+                    btn = document.createElement('button');
+                    btn.onclick = () => {
+                        if (menu.id === 'menu') {
+                            const sb = document.getElementById('sidebar');
+                            const ov = document.getElementById('sidebar-overlay');
+                            if (sb) sb.classList.remove('-translate-x-full');
+                            if (ov) { ov.classList.remove('hidden'); ov.classList.add('flex'); }
+                        } else {
+                            window.navigateTo(menu.id);
+                        }
+                    };
+                    nav.appendChild(btn);
+                }
+
+                btn.className = 'flex flex-col items-center justify-center flex-1 min-w-0 py-1 gap-0.5 transition-colors duration-300 ' +
                     (isActive ? 'text-orange-400' : 'text-slate-400 hover:text-orange-300');
-                btn.innerHTML = `<i class="fas ${menu.icon} text-lg"></i><span style="font-size:10px;font-weight:600;white-space:nowrap;">${menu.name}</span>`;
-                btn.onclick = () => {
-                    if (menu.id === 'menu') {
-                        // Buka sidebar overlay
-                        const sb = document.getElementById('sidebar');
-                        const ov = document.getElementById('sidebar-overlay');
-                        if (sb) sb.classList.remove('-translate-x-full');
-                        if (ov) { ov.classList.remove('hidden'); ov.classList.add('flex'); }
-                    } else {
-                        window.navigateTo(menu.id);
-                    }
-                };
-                nav.appendChild(btn);
+                btn.innerHTML = `<i class="fas ${menu.icon} text-lg transition-colors duration-300"></i><span style="font-size:10px;font-weight:600;white-space:nowrap;" class="transition-colors duration-300">${menu.name}</span>`;
             });
         }
 
@@ -8758,7 +8780,11 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             if(!student) return;
 
             if (pk.items.length === 0) {
-                return alert("Belum ada item tagihan! Silakan tambahkan Item Tagihan terlebih dahulu.");
+                if(typeof window.showAlert === 'function') {
+                    return window.showAlert("Belum ada item tagihan! Silakan tambahkan Item Tagihan terlebih dahulu.");
+                } else {
+                    return alert("Belum ada item tagihan! Silakan tambahkan Item Tagihan terlebih dahulu.");
+                }
             }
 
             if(!pk.transaksi[studentId]) pk.transaksi[studentId] = {};
