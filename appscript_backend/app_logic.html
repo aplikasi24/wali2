@@ -7343,9 +7343,27 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                 trs = '<tr><td colspan="6" class="text-center p-8 text-slate-500 italic">Belum ada data siswa.</td></tr>';
             }
 
+            if (typeof window.pengeluaranPage === 'undefined') window.pengeluaranPage = 1;
+            if (typeof window.pengeluaranPerPage === 'undefined') window.pengeluaranPerPage = 10;
+            
             let totalPengeluaran = 0;
-            let trsPengeluaran = k.pengeluaran.map(p => {
-                totalPengeluaran += p.nominal;
+            k.pengeluaran.forEach(p => totalPengeluaran += p.nominal);
+
+            let dataPengeluaran = k.pengeluaran;
+            let totalPagesPengeluaran = 1;
+            
+            if (window.pengeluaranPerPage !== 'semua') {
+                let limit = parseInt(window.pengeluaranPerPage);
+                totalPagesPengeluaran = Math.ceil(dataPengeluaran.length / limit) || 1;
+                
+                if (window.pengeluaranPage > totalPagesPengeluaran) window.pengeluaranPage = totalPagesPengeluaran;
+                if (window.pengeluaranPage < 1) window.pengeluaranPage = 1;
+                
+                const startIndex = (window.pengeluaranPage - 1) * limit;
+                dataPengeluaran = dataPengeluaran.slice(startIndex, startIndex + limit);
+            }
+
+            let trsPengeluaran = dataPengeluaran.map(p => {
                 return `
                 <tr class="border-b border-slate-100">
                     <td class="p-2 text-sm">${p.tgl}</td>
@@ -7358,6 +7376,29 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             
             if(k.pengeluaran.length === 0) {
                 trsPengeluaran = '<tr><td colspan="4" class="text-center p-4 text-slate-500 italic">Belum ada pengeluaran.</td></tr>';
+            }
+            
+            let paginationHtml = '';
+            if (k.pengeluaran.length > 10 || window.pengeluaranPerPage !== 10) {
+                paginationHtml = `
+                <div class="flex flex-col sm:flex-row justify-between items-center bg-slate-50 border-t border-slate-200 p-3 gap-3">
+                    <div class="flex items-center gap-2 text-sm text-slate-600 font-medium">
+                        Tampilkan:
+                        <select onchange="window.setPengeluaranPerPage(this.value)" class="border border-slate-300 rounded-lg px-2 py-1 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 bg-white">
+                            <option value="10" ${window.pengeluaranPerPage == 10 ? 'selected' : ''}>10</option>
+                            <option value="20" ${window.pengeluaranPerPage == 20 ? 'selected' : ''}>20</option>
+                            <option value="semua" ${window.pengeluaranPerPage === 'semua' ? 'selected' : ''}>Semua</option>
+                        </select>
+                    </div>
+                    ${window.pengeluaranPerPage !== 'semua' ? `
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.navigasiPengeluaranPage(-1)" ${window.pengeluaranPage <= 1 ? 'disabled' : ''} class="px-2 py-1 bg-white border border-slate-300 text-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition shadow-sm"><i class="fas fa-chevron-left"></i></button>
+                        <span class="text-sm font-bold text-slate-700 mx-1">Hal ${window.pengeluaranPage} dari ${totalPagesPengeluaran}</span>
+                        <button onclick="window.navigasiPengeluaranPage(1)" ${window.pengeluaranPage >= totalPagesPengeluaran ? 'disabled' : ''} class="px-2 py-1 bg-white border border-slate-300 text-slate-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition shadow-sm"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    ` : ''}
+                </div>
+                `;
             }
 
             const saldoAkhir = totalKeseluruhanBayar - totalPengeluaran;
@@ -7467,6 +7508,7 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                                     </tr>
                                 </tfoot>
                             </table>
+                            ${paginationHtml}
                         </div>
 
                         <div class="mt-auto pt-5 border-t border-slate-100">
@@ -7644,6 +7686,17 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                     navigateTo('kas_kelas');
                 }
             );
+        };
+
+        window.setPengeluaranPerPage = (val) => {
+            window.pengeluaranPerPage = val;
+            window.pengeluaranPage = 1;
+            navigateTo('kas_kelas');
+        };
+
+        window.navigasiPengeluaranPage = (dir) => {
+            window.pengeluaranPage += dir;
+            navigateTo('kas_kelas');
         };
 
         // --- 7. Navigation Router ---
