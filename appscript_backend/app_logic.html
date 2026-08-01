@@ -7450,8 +7450,10 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
                                 <span class="px-4 font-bold text-slate-800 text-sm whitespace-nowrap">${datesToCheck.length > 0 ? viewedDateFormatted : 'Tidak ada hari aktif'}</span>
                                 <button onclick="window.navigasiHariKas(1)" ${!hasNext ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg text-slate-600 font-bold hover:bg-white hover:shadow-sm disabled:opacity-30 transition">Next <i class="fas fa-chevron-right ml-1"></i></button>
                             </div>
-                            <button onclick="window.bayarSemuaKas('${viewedDateStr}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-check-double mr-1.5"></i>Lunas Semua</button>
-                        </div>
+                            <div class="flex gap-2">
+                                <button onclick="window.bukaFilterTunggakan()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-search-dollar mr-1.5"></i>Filter Pintar</button>
+                                <button onclick="window.bayarSemuaKas('${viewedDateStr}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm whitespace-nowrap"><i class="fas fa-check-double mr-1.5"></i>Lunas Semua</button>
+                            </div>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-slate-200">
                         <table class="w-full text-left border-collapse whitespace-nowrap min-w-max">
@@ -7626,6 +7628,147 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
         window.navigasiHariKas = (dir) => {
             window.kasCurrentDateIndex += dir;
             navigateTo('kas_kelas');
+        };
+
+        window.bukaFilterTunggakan = () => {
+            const k = db.kas_kelas;
+            const nom = k.nominal;
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            let datesToCheck = [];
+            
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        datesToCheck.push(currentDate.toISOString().split('T')[0]);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+
+            let tunggakanHtml = '';
+            let countTunggakan = 0;
+
+            db.students.forEach(s => {
+                let totalKurangSiswa = 0;
+                let arrTunggakan = [];
+                
+                datesToCheck.forEach(d => {
+                    let byr = (k.pembayaran[s.id] && k.pembayaran[s.id][d]) !== undefined ? k.pembayaran[s.id][d] : 0;
+                    if(byr < nom) {
+                        let kurang = nom - byr;
+                        totalKurangSiswa += kurang;
+                        let [yyyy, mm, dd] = d.split('-');
+                        arrTunggakan.push({ dateStr: d, formatTgl: `${dd}/${mm}/${yyyy}`, kurang });
+                    }
+                });
+
+                if (totalKurangSiswa > 0) {
+                    countTunggakan++;
+                    let rincianHtml = arrTunggakan.map(t => `
+                        <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-100 mb-1">
+                            <span class="text-xs font-medium text-slate-600"><i class="fas fa-calendar-alt text-slate-400 mr-1"></i>${t.formatTgl}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-red-600">Rp ${t.kurang.toLocaleString('id-ID')}</span>
+                                <button onclick="window.lunasiSatuTunggakan('${s.id}', '${t.dateStr}', ${nom})" class="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200 px-2 py-1 rounded text-[10px] font-bold transition shadow-sm">Lunas</button>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    let sHtml = `
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 hover:shadow-md transition">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h4 class="font-bold text-slate-800">${s.name}</h4>
+                                <span class="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full inline-block mt-1 border border-red-200">Total: Rp ${totalKurangSiswa.toLocaleString('id-ID')}</span>
+                            </div>
+                            <button onclick="window.lunasiSemuaTunggakanSiswa('${s.id}')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition"><i class="fas fa-check-circle mr-1"></i>Lunas Semua</button>
+                        </div>
+                        <div class="space-y-1">
+                            ${rincianHtml}
+                        </div>
+                    </div>
+                    `;
+                    tunggakanHtml += sHtml;
+                }
+            });
+
+            if (countTunggakan === 0) {
+                tunggakanHtml = '<div class="text-center py-10"><i class="fas fa-check-circle text-5xl text-emerald-400 mb-4"></i><h3 class="text-lg font-bold text-slate-700">Hebat!</h3><p class="text-slate-500">Tidak ada siswa yang menunggak kas.</p></div>';
+            }
+
+            const modalHtml = `
+            <div id="filter-tunggakan-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[90vh]">
+                    <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 relative">
+                        <h3 class="font-bold text-lg text-slate-800"><i class="fas fa-search-dollar text-indigo-500 mr-2"></i>Filter Pintar</h3>
+                        <button onclick="window.tutupFilterTunggakan()" class="text-slate-400 hover:text-red-500 transition text-2xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 absolute right-4 top-4">&times;</button>
+                    </div>
+                    <div class="p-5 overflow-y-auto flex-1 bg-slate-100/50">
+                        ${tunggakanHtml}
+                    </div>
+                </div>
+            </div>
+            `;
+            
+            let existing = document.getElementById('filter-tunggakan-modal');
+            if (existing) existing.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            setTimeout(() => {
+                const modal = document.getElementById('filter-tunggakan-modal');
+                if(modal) {
+                    modal.classList.remove('opacity-0');
+                    modal.children[0].classList.remove('scale-95');
+                }
+            }, 10);
+        };
+
+        window.tutupFilterTunggakan = () => {
+            const modal = document.getElementById('filter-tunggakan-modal');
+            if(modal) {
+                modal.classList.add('opacity-0');
+                modal.children[0].classList.add('scale-95');
+                setTimeout(() => modal.remove(), 300);
+            }
+        };
+
+        window.lunasiSatuTunggakan = (studentId, dateStr, nominal) => {
+            if(!db.kas_kelas.pembayaran[studentId]) db.kas_kelas.pembayaran[studentId] = {};
+            db.kas_kelas.pembayaran[studentId][dateStr] = nominal;
+            saveDB();
+            window.bukaFilterTunggakan(); 
+            navigateTo('kas_kelas'); 
+        };
+
+        window.lunasiSemuaTunggakanSiswa = (studentId) => {
+            const k = db.kas_kelas;
+            const nom = k.nominal;
+            const tglMulai = new Date(k.tanggal_mulai);
+            const hariIni = new Date();
+            
+            if(!k.pembayaran[studentId]) k.pembayaran[studentId] = {};
+
+            if (!isNaN(tglMulai.getTime()) && tglMulai <= hariIni) {
+                let currentDate = new Date(tglMulai);
+                while (currentDate <= hariIni) {
+                    const hariNama = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][currentDate.getDay()];
+                    if (k.hari_aktif[hariNama]) {
+                        let d = currentDate.toISOString().split('T')[0];
+                        let byr = k.pembayaran[studentId][d] || 0;
+                        if(byr < nom) {
+                            k.pembayaran[studentId][d] = nom;
+                        }
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+            }
+            saveDB();
+            window.bukaFilterTunggakan(); 
+            navigateTo('kas_kelas'); 
         };
 
         window.bayarSemuaKas = (dateStr) => {
