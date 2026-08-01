@@ -118,7 +118,7 @@
             { id: "pengaturan", name: "Pengaturan", icon: "fa-cog", title: "Pengaturan", desc: "Konfigurasi profil guru dan identitas kelas." }
         ];
 
-        let currentPage = "dashboard";
+        window.currentPage = "dashboard";
 
         // --- DOM Elements ---
         const sidebarNav = document.getElementById('sidebar-nav');
@@ -146,7 +146,7 @@
 
                 appMenus.forEach((menu, index) => {
                     try {
-                        const isActive = menu.id === currentPage;
+                        const isActive = menu.id === window.currentPage;
                         let link;
                         
                         if (hasChildren && sidebarNav.children[index]) {
@@ -211,7 +211,7 @@
             }
 
             bottomNavMenus.forEach((menu, index) => {
-                const isActive = (menu.id !== 'menu') && (currentPage === menu.id);
+                const isActive = (menu.id !== 'menu') && (window.currentPage === menu.id);
                 let btn;
 
                 if (hasChildren && nav.children[index]) {
