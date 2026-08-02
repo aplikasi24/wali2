@@ -1991,6 +1991,13 @@
         window.currentAbsenDate = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
 
         window.simpanAbsen = (studentId, status) => {
+            const namaHariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const dObj = new Date(window.currentAbsenDate);
+            const nHari = namaHariIndo[dObj.getDay()];
+            const isLiburMan = db.libur_dates && !!db.libur_dates[window.currentAbsenDate];
+            const isEfektif = db.hari_efektif && db.hari_efektif.includes(nHari) && !isLiburMan;
+            if (!isEfektif) return;
+
             if(!db.attendance[window.currentAbsenDate]) db.attendance[window.currentAbsenDate] = {};
             db.attendance[window.currentAbsenDate][studentId] = status;
             saveDB();
@@ -1999,12 +2006,18 @@
             let hadir = 0, sakit = 0, izin = 0, alpa = 0;
             
             Object.keys(db.attendance || {}).forEach(date => {
-                if(date.startsWith(currentMonthPrefix) && db.attendance[date][studentId]) {
-                    const st = db.attendance[date][studentId];
-                    if(st === 'Hadir') hadir++;
-                    else if(st === 'Sakit') sakit++;
-                    else if(st === 'Izin') izin++;
-                    else if(st === 'Alpa') alpa++;
+                if(date.startsWith(currentMonthPrefix)) {
+                    const dtObj = new Date(date);
+                    const dnHari = namaHariIndo[dtObj.getDay()];
+                    const dIsLiburMan = db.libur_dates && !!db.libur_dates[date];
+                    const dIsEfektif = db.hari_efektif && db.hari_efektif.includes(dnHari) && !dIsLiburMan;
+                    if (dIsEfektif && db.attendance[date][studentId]) {
+                        const st = db.attendance[date][studentId];
+                        if(st === 'Hadir') hadir++;
+                        else if(st === 'Sakit') sakit++;
+                        else if(st === 'Izin') izin++;
+                        else if(st === 'Alpa') alpa++;
+                    }
                 }
             });
             
@@ -2320,7 +2333,11 @@
                     const st = db.attendance[dateStr] ? db.attendance[dateStr][s.id] : '';
                     let char = '-';
                     
-                    const isLiburRecap = db.libur_dates && db.libur_dates[dateStr];
+                    const namaHariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                    const dtObj = new Date(dateStr);
+                    const dnHari = namaHariIndo[dtObj.getDay()];
+                    const isLiburMan = db.libur_dates && !!db.libur_dates[dateStr];
+                    const isLiburRecap = !db.hari_efektif.includes(dnHari) || isLiburMan;
                     if (isLiburRecap) {
                         char = 'L';
                     } else if(st==='Hadir') char = 'H';
@@ -2448,34 +2465,43 @@
             
             Object.keys(db.attendance || {}).forEach(date => {
                 if(date.startsWith(currentMonthPrefix)) {
-                    Object.entries(db.attendance[date]).forEach(([sid, status]) => {
-                        if(monthlyRecap[sid] && monthlyRecap[sid][status] !== undefined) {
-                            monthlyRecap[sid][status]++;
-                        }
-                    });
+                    const namaHariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                    const dtObj = new Date(date);
+                    const dnHari = namaHariIndo[dtObj.getDay()];
+                    const dIsLiburMan = db.libur_dates && !!db.libur_dates[date];
+                    const dIsEfektif = db.hari_efektif && db.hari_efektif.includes(dnHari) && !dIsLiburMan;
+                    if (dIsEfektif) {
+                        Object.entries(db.attendance[date]).forEach(([sid, status]) => {
+                            if(monthlyRecap[sid] && monthlyRecap[sid][status] !== undefined) {
+                                monthlyRecap[sid][status]++;
+                            }
+                        });
+                    }
                 }
             });
 
             const currentData = db.attendance[window.currentAbsenDate] || {};
 
             let trs = db.students.map((s, index) => {
-                const status = currentData[s.id] || '';
+                const status = isHariEfektif ? (currentData[s.id] || '') : '';
                 const recap = monthlyRecap[s.id];
+                const dAttr = isHariEfektif ? '' : 'disabled title="Libur/Tidak ada Jadwal"';
+                const cCls = isHariEfektif ? 'cursor-pointer' : 'cursor-not-allowed opacity-40';
                 return `
                 <tr class="hover:bg-blue-50 transition-colors">
                     <td class="py-2 px-3 text-center border border-gray-200">${index + 1}</td>
                     <td class="py-2 px-3 font-medium border border-gray-200 text-gray-800">${s.name}</td>
                     <td class="py-2 px-3 text-center border border-gray-200">
-                        <input type="radio" name="absen_${s.id}" value="Hadir" onchange="simpanAbsen(${s.id}, 'Hadir')" ${status === 'Hadir' ? 'checked' : ''} class="w-4 h-4 cursor-pointer">
+                        <input type="radio" name="absen_${s.id}" value="Hadir" onchange="simpanAbsen(${s.id}, 'Hadir')" ${status === 'Hadir' ? 'checked' : ''} ${dAttr} class="w-4 h-4 ${cCls}">
                     </td>
                     <td class="py-2 px-3 text-center border border-gray-200">
-                        <input type="radio" name="absen_${s.id}" value="Sakit" onchange="simpanAbsen(${s.id}, 'Sakit')" ${status === 'Sakit' ? 'checked' : ''} class="w-4 h-4 cursor-pointer">
+                        <input type="radio" name="absen_${s.id}" value="Sakit" onchange="simpanAbsen(${s.id}, 'Sakit')" ${status === 'Sakit' ? 'checked' : ''} ${dAttr} class="w-4 h-4 ${cCls}">
                     </td>
                     <td class="py-2 px-3 text-center border border-gray-200">
-                        <input type="radio" name="absen_${s.id}" value="Izin" onchange="simpanAbsen(${s.id}, 'Izin')" ${status === 'Izin' ? 'checked' : ''} class="w-4 h-4 cursor-pointer">
+                        <input type="radio" name="absen_${s.id}" value="Izin" onchange="simpanAbsen(${s.id}, 'Izin')" ${status === 'Izin' ? 'checked' : ''} ${dAttr} class="w-4 h-4 ${cCls}">
                     </td>
                     <td class="py-2 px-3 text-center border border-gray-200">
-                        <input type="radio" name="absen_${s.id}" value="Alpa" onchange="simpanAbsen(${s.id}, 'Alpa')" ${status === 'Alpa' ? 'checked' : ''} class="w-4 h-4 cursor-pointer">
+                        <input type="radio" name="absen_${s.id}" value="Alpa" onchange="simpanAbsen(${s.id}, 'Alpa')" ${status === 'Alpa' ? 'checked' : ''} ${dAttr} class="w-4 h-4 ${cCls}">
                     </td>
                     <td id="recap-hadir-${s.id}" class="py-2 px-3 text-center border border-gray-200 text-green-700 font-bold bg-green-50">${recap.Hadir}</td>
                     <td id="recap-sakit-${s.id}" class="py-2 px-3 text-center border border-gray-200 text-yellow-700 font-bold bg-yellow-50">${recap.Sakit}</td>
@@ -8983,8 +9009,14 @@ Pastikan tulisan nama hari beserta daftar nama siswanya sesuai data di atas dima
             // Auto-fill "Hadir" for today if empty (so it defaults to Hadir)
             const todayStr = new Date().toLocaleDateString('en-CA');
             if(!db.attendance[todayStr] && db.students && db.students.length > 0) {
-                db.attendance[todayStr] = {};
-                db.students.forEach(s => db.attendance[todayStr][s.id] = 'Hadir');
+                const namaHariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const nHariToday = namaHariIndo[new Date(todayStr).getDay()];
+                const isLiburManToday = db.libur_dates && !!db.libur_dates[todayStr];
+                const isEfektifToday = db.hari_efektif && db.hari_efektif.includes(nHariToday) && !isLiburManToday;
+                if (isEfektifToday) {
+                    db.attendance[todayStr] = {};
+                    db.students.forEach(s => db.attendance[todayStr][s.id] = 'Hadir');
+                }
             }
             saveDB();
 
