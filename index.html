@@ -24,6 +24,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- SheetJS with Style Support for Excel Import/Export -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <!-- SweetAlert2 for modern popups -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #3b82f6; border-radius: 4px; }
@@ -386,7 +388,7 @@
     <script>
         // --- APPSCRIPT BACKEND URL ---
         // GANTI URL INI DENGAN URL WEB APP DARI GOOGLE APPS SCRIPT ANDA
-        const APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx12yGIRpw_elY8nPSzpKLezw3svseqT0GhAP6XTVnOsRF5QavBIRes_SXMPXD5gl7vfg/exec';
+        const APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-A-OC3zLNstXeZNymplCvu9QTXCPI1VC-_zv7AV397p-ekGvQsdfxp0Dmk5R0INBu/exec';
         
         window.currentUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
 
@@ -630,11 +632,27 @@
         };
 
         window.handleLogout = () => {
-            if(confirm("Anda yakin ingin keluar dari aplikasi?")) {
-                window.currentUser = null;
-                localStorage.removeItem('auth_user');
-                location.reload();
-            }
+            Swal.fire({
+                title: 'Keluar Aplikasi?',
+                text: "Anda yakin ingin keluar dari aplikasi?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: '<i class="fas fa-sign-out-alt"></i> Ya, Keluar!',
+                cancelButtonText: 'Batal',
+                customClass: {
+                    popup: 'rounded-xl',
+                    confirmButton: 'rounded-lg px-4 py-2 font-bold',
+                    cancelButton: 'rounded-lg px-4 py-2 font-bold'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.currentUser = null;
+                    localStorage.removeItem('auth_user');
+                    location.reload();
+                }
+            });
         };
 
         // Register Service Worker for PWA (Install to Home Screen)
